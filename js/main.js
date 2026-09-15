@@ -1,0 +1,258 @@
+import * as S from './state.js';
+import * as UI from './ui.js';
+import { openScoreModal, openInfoModal } from './modal.js';
+import { runDrawAnimation } from './wheel.js';
+import { updateTicker } from './ticker.js';
+
+const appEl = document.getElementById('app');
+let state = S.loadState();
+
+// Estado de navegação só de tela (não persiste) — hoje só controla o "voltar
+// pra ver a Rodada 1" a partir da Rodada 2.
+const uiExtra = { showRound1Recap: false };
+
+function rerender() {
+  UI.render(state, appEl, uiExtra);
+  updateTicker(state);
+}
+function persistAndRerender() {
+  S.saveState(state);
+  rerender();
+}
+function mutate(fn) {
+  fn(state);
+  persistAndRerender();
+}
+
+function playersPool() {
+  return state.players.map((p) => ({ name: p.name, team: p.team, color1: p.color1, color2: p.color2 }));
+}
+
+function findMatch(matchId) {
+  const pools = [];
+  if (state.round1) pools.push(state.round1.matches);
+  if (state.round2) {
+    pools.push(state.round2.matches);
+    if (state.round2.byeDuelMatch) pools.push([state.round2.byeDuelMatch]);
+  }
+  if (state.knockout) {
+    for (const r of state.knockout.rounds) pools.push(r.matches);
+    if (state.knockout.thirdPlace) pools.push([state.knockout.thirdPlace]);
+  }
+  for (const pool of pools) {
+    const found = pool.find((m) => m.id === matchId);
+    if (found) return found;
+  }
+  return null;
+}
+
+function playerRef(id) {
+  const p = S.getPlayer(state, id);
+  return p ? { name: p.name, team: p.team, color1: p.color1, color2: p.color2 } : { name: '?', team: '', color1: '#ff7a1a', color2: '#1a1a22' };
+}
+
+async function revealRound1() {
+  const r1 = state.round1;
+  const items = r1.matches.map((m, i) => ({
+    kind: 'match',
+    title: `Confronto ${i + 1}`,
+    player1: playerRef(m.player1Id),
+    player2: playerRef(m.player2Id),
+  }));
+  if (r1.byePlayerId) {
+    items.push({ kind: 'bye', title: 'Folga da rodada', player: playerRef(r1.byePlayerId) });
+  }
+  await runDrawAnimation({ items, playersPool: playersPool(), caption: 'Sorteio · Rodada 1' });
+  mutate((s) => (s.reveal.round1 = true));
+}
+
+appEl.addEventListener('submit', (e) => {
+  const addForm = e.target.closest('#add-player-form');
+  const lateForm = e.target.closest('#late-player-form');
+  if (!addForm && !lateForm) return;
+  e.preventDefault();
+  const form = addForm || lateForm;
+  const nameInput = form.querySelector('input[name="name"]');
+  const teamInput = form.querySelector('input[name="team"]');
+  const color1Input = form.querySelector('input[name="color1"]');
+  const color2Input = form.querySelector('input[name="color2"]');
+  const name = nameInput.value;
+  const team = teamInput.value;
+  const color1 = color1Input.value;
+  const color2 = color2Input.value;
+  if (!name.trim()) return;
+  if (addForm) {
+    mutate((s) => S.addPlayer(s, name, team, color1, color2));
+  } else {
+    mutate((s) => S.addLatePlayer(s, name, team, color1, color2));
+  }
+  nameInput.value = '';
+  teamInput.value = '';
+  color1Input.value = '#ff7a1a';
+  color2Input.value = '#1a1a22';
+  nameInput.focus();
+});
+
+appEl.addEventListener('change', (e) => {
+  const directKnockoutEl = e.target.closest('[data-action="set-direct-knockout"]');
+  if (directKnockoutEl) {
+    mutate((s) => S.setConfig(s, { directKnockout: directKnockoutEl.checked }));
+    return;
+  }
+
+  const thirdPlaceEl = e.target.closest('[data-action="set-third-place"]');
+  if (thirdPlaceEl) {
+    mutate((s) => S.setConfig(s, { thirdPlaceMatch: thirdPlaceEl.checked }));
+    return;
+  }
+
+  if (e.target.id === 'backup-file-input') {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!confirm('Isso vai substituir todo o progresso atual (jogadores, placares, fase) pelo conteúdo desse arquivo de backup. Não dá pra desfazer. Continuar?')) {
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const restored = S.importStateFromJson(reader.result);
+        state = restored;
+        uiExtra.showRound1Recap = false;
+        persistAndRerender();
+      } catch (err) {
+        alert('Não consegui carregar esse backup: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+});
+
+const TELAO_ALLOWED_ACTIONS = new Set(['toggle-view', 'reset-all', 'download-backup', 'trigger-upload-backup']);
+
+appEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  if (state.viewMode === 'telao' && !TELAO_ALLOWED_ACTIONS.has(action)) return;
+
+  switch (action) {
+    case 'remove-player':
+      mutate((s) => S.removePlayer(s, btn.dataset.id));
+      break;
+
+    case 'goto-config':
+      mutate((s) => S.goToConfig(s));
+      break;
+
+    case 'back-to-registration':
+      mutate((s) => S.backToRegistration(s));
+      break;
+
+    case 'set-cutoff':
+      mutate((s) => S.setConfig(s, { cutoffSize: Number(btn.dataset.value) }));
+      break;
+
+    case 'set-classification':
+      mutate((s) => S.setConfig(s, { classification: btn.dataset.value }));
+      break;
+
+    case 'set-odd-handling':
+      mutate((s) => S.setConfig(s, { oddHandling: btn.dataset.value }));
+      break;
+
+    case 'set-fixed-bye-points':
+      mutate((s) => S.setConfig(s, { fixedByePoints: Number(btn.dataset.value) }));
+      break;
+
+    case 'start-tournament':
+      mutate((s) => S.startTournament(s));
+      break;
+
+    case 'reveal-round1':
+      revealRound1();
+      break;
+
+    case 'show-final-standings':
+      openInfoModal(UI.finalStandingsModalHtml(state));
+      break;
+
+    case 'mark-playing': {
+      const matchId = btn.dataset.matchId;
+      const list = S.getActiveMatchList(state);
+      mutate((s) => S.setMatchPlaying(s, matchId, list));
+      break;
+    }
+
+    case 'open-score': {
+      const matchId = btn.dataset.matchId;
+      const m = findMatch(matchId);
+      if (!m) break;
+      openScoreModal(m, S.playerLabel(state, m.player1Id), S.playerLabel(state, m.player2Id), (result) => {
+        mutate((s) => S.setMatchResult(s, matchId, result));
+      });
+      break;
+    }
+
+    case 'advance-round2':
+      mutate((s) => S.advanceToRound2(s));
+      break;
+
+    case 'view-round1-recap':
+      uiExtra.showRound1Recap = true;
+      rerender();
+      break;
+
+    case 'back-to-round2':
+      uiExtra.showRound1Recap = false;
+      rerender();
+      break;
+
+    case 'advance-cutoff':
+      uiExtra.showRound1Recap = false;
+      mutate((s) => S.advanceToCutoff(s));
+      break;
+
+    case 'generate-bracket':
+      mutate((s) => S.generateBracketFromCutoff(s));
+      break;
+
+    case 'advance-knockout':
+      mutate((s) => S.advanceKnockout(s));
+      break;
+
+    case 'toggle-view':
+      mutate((s) => (s.viewMode = s.viewMode === 'operator' ? 'telao' : 'operator'));
+      break;
+
+    case 'download-backup': {
+      const json = S.exportStateAsJson(state);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `campeonato-fifa-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      break;
+    }
+
+    case 'trigger-upload-backup':
+      document.getElementById('backup-file-input').click();
+      break;
+
+    case 'reset-all':
+      if (confirm('Isso vai apagar todos os jogadores, placares e configurações. Tem certeza?')) {
+        state = S.resetAll();
+        uiExtra.showRound1Recap = false;
+        rerender();
+      }
+      break;
+  }
+});
+
+rerender();
