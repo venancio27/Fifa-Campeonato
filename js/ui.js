@@ -7,12 +7,51 @@ export function esc(str) {
   return d.innerHTML;
 }
 
-// Duas "fitinhas" verticais com as cores do time — um detalhe discreto, não um
-// escudo. Usado na lista de jogadores, no sorteio e no ticker.
+// Bandeirinha horizontal com as cores do time (Cor 1 - Cor 2 - Cor 1, em faixa
+// diagonal) — um detalhe discreto, não um escudo. Usado na lista de jogadores,
+// no sorteio e no ticker.
 export function colorRibbon(p, className = 'color-ribbon') {
   const c1 = esc((p && p.color1) || '#ff7a1a');
   const c2 = esc((p && p.color2) || '#1a1a22');
-  return `<span class="${className}"><span style="background:${c1}"></span><span style="background:${c2}"></span></span>`;
+  const gradient = `linear-gradient(to top right, ${c1} 0%, ${c1} 33%, ${c2} 33%, ${c2} 66%, ${c1} 66%, ${c1} 100%)`;
+  return `<span class="${className}" style="background:${gradient}; border-color:${c1};"></span>`;
+}
+
+// Campo de cor com o código hex como forma principal de digitar (primeira
+// opção, editável) e um seletor visual pequeno ao lado, sincronizado com ele.
+export function colorFieldHtml(name, label, value) {
+  const v = esc((value || '#ff7a1a').toLowerCase());
+  return `
+    <label class="color-field" title="${esc(label)} do time">
+      <span class="color-field-label">${esc(label)}</span>
+      <span class="color-input-group">
+        <input type="text" name="${name}" class="color-hex-input" value="${v}" maxlength="7" placeholder="#RRGGBB" autocomplete="off" spellcheck="false" />
+        <input type="color" class="color-swatch-input" value="${v}" tabindex="-1" aria-label="Selecionar ${esc(label)} visualmente" />
+      </span>
+    </label>`;
+}
+
+// Sincroniza o campo de texto (hex) com o seletor visual de cor, nos dois
+// sentidos, via delegação de evento — funciona tanto no form de cadastro
+// (montado em #app) quanto no modal de edição (montado fora dele).
+export function wireColorInputs(root) {
+  root.addEventListener('input', (e) => {
+    const swatch = e.target.closest('.color-swatch-input');
+    if (swatch) {
+      const group = swatch.closest('.color-input-group');
+      const hexInput = group && group.querySelector('.color-hex-input');
+      if (hexInput) hexInput.value = swatch.value;
+      return;
+    }
+    const hexInput = e.target.closest('.color-hex-input');
+    if (hexInput) {
+      const group = hexInput.closest('.color-input-group');
+      const swatchInput = group && group.querySelector('.color-swatch-input');
+      if (swatchInput && /^#[0-9a-fA-F]{6}$/.test(hexInput.value)) {
+        swatchInput.value = hexInput.value;
+      }
+    }
+  });
 }
 
 function scoreText(m) {
@@ -165,12 +204,8 @@ export function buildTickerItems(state) {
 function teamFieldHtml() {
   return `
     <input type="text" name="team" placeholder="Time do FIFA" autocomplete="off" />
-    <label class="color-field" title="Cor 1 do time">
-      <input type="color" name="color1" value="#ff7a1a" />
-    </label>
-    <label class="color-field" title="Cor 2 do time">
-      <input type="color" name="color2" value="#1a1a22" />
-    </label>`;
+    ${colorFieldHtml('color1', 'Cor 1', '#ff7a1a')}
+    ${colorFieldHtml('color2', 'Cor 2', '#1a1a22')}`;
 }
 
 // A capa da tela de cadastro. Segue a linguagem da landing page da igreja:
@@ -215,6 +250,7 @@ function renderRegistration(state) {
         <span class="p-name">${esc(p.name)}</span>
         ${colorRibbon(p)}
         <span class="p-team">${esc(p.team || '—')}</span>
+        <button class="btn btn-icon" data-action="edit-player" data-id="${p.id}" title="Editar" aria-label="Editar">✎</button>
         <button class="btn btn-icon" data-action="remove-player" data-id="${p.id}" title="Remover" aria-label="Remover">✕</button>
       </li>`
     )
@@ -339,47 +375,41 @@ function renderConfigScreen(state) {
 }
 
 // ---------- Rodadas (grupo) ----------
-function renderRoundReveal(caption, actionName) {
+function renderRoundReveal(caption, actionName, extra = '') {
   return `
     <section class="panel reveal-panel">
       <div class="reveal-icon">🎬</div>
-      <h2>${esc(caption)}</h2>
+      <h2>${esc(caption)} ${extra}</h2>
       <p class="hint">Clique para revelar os confrontos com uma animaçãozinha de sorteio.</p>
       <button class="btn btn-primary btn-lg" data-action="${actionName}">Revelar sorteio</button>
     </section>`;
 }
 
-function lateArrivalWidget() {
-  return `
-    <div class="late-arrival">
-      <div class="late-arrival-title">🏃 Jogador chegou atrasado?</div>
-      <form id="late-player-form" class="add-player-form">
-        <input type="text" name="name" placeholder="Nome do jogador" autocomplete="off" required />
-        ${teamFieldHtml()}
-        <button type="submit" class="btn btn-ghost">Encaixar na Rodada 1</button>
-      </form>
-      <p class="hint">Se já havia folguista, ele encara o recém-chegado num confronto real. Se não havia, o recém-chegado vira o folguista da rodada.</p>
-    </div>`;
+// Um ícone só (⚙, discreto) concentra todos os ajustes de operador da rodada:
+// corte do mata-mata, tratamento do número ímpar e cadastro tardio. A tela
+// principal fica só com os confrontos — esses ajustes são exceção, não rotina.
+function settingsIconHtml(state) {
+  if (!hasRoundSettings(state)) return '';
+  return `<button type="button" class="btn-icon-standings" data-action="open-settings-modal" title="Configurações da rodada (corte, número ímpar, jogador atrasado)">⚙</button>`;
+}
+
+function hasRoundSettings(state) {
+  if (S.availableCutoffSizes(state).length > 1) return true;
+  if (state.phase === 'round1' && state.round1 && state.round1.byePlayerId) return true;
+  return S.canAddLatePlayer(state);
 }
 
 function renderRound1(state) {
-  const late = S.canAddLatePlayer(state) ? lateArrivalWidget() : '';
-  if (!state.reveal.round1) return renderRoundReveal('Sorteio da Rodada 1', 'reveal-round1') + `<section class="panel">${late}</section>`;
+  if (!state.reveal.round1) return renderRoundReveal('Sorteio da Rodada 1', 'reveal-round1', settingsIconHtml(state));
   const r1 = state.round1;
   const cards = r1.matches.map((m) => matchCard(state, m)).join('');
   const bye = byeCard(state, r1.byePlayerId, state.config);
-  // Se um cadastro tardio deixou o total ímpar no meio da Rodada 1, essa
-  // escolha nunca apareceu na configuração — dá pra decidir aqui, enquanto
-  // ainda não avançou pra Rodada 2.
-  const oddChoice = r1.byePlayerId ? oddHandlingFieldHtml(state.config, state.players.length) : '';
   const complete = r1.matches.every((m) => E.isMatchComplete(m));
   return `
     <section class="panel">
-      <h2>Rodada 1 <span class="muted">· sorteio aleatório</span></h2>
+      <h2>Rodada 1 <span class="muted">· sorteio aleatório</span> ${settingsIconHtml(state)}</h2>
       ${bye}
-      ${oddChoice}
       <div class="match-grid">${cards}</div>
-      ${late}
       <button class="btn btn-primary btn-lg" data-action="advance-round2" ${complete ? '' : 'disabled'}>
         Avançar para Rodada 2 ➜
       </button>
@@ -418,7 +448,7 @@ function renderRound2(state, uiExtra = {}) {
   const complete = r2.matches.every((m) => E.isMatchComplete(m)) && (!r2.byeDuelMatch || E.isMatchComplete(r2.byeDuelMatch));
   return `
     <section class="panel">
-      <h2>Rodada 2 <span class="muted">· pareamento por colocação</span></h2>
+      <h2>Rodada 2 <span class="muted">· pareamento por colocação</span> ${settingsIconHtml(state)}</h2>
       <p class="hint"><button type="button" class="link-btn" data-action="view-round1-recap">‹ Ver resultado da Rodada 1</button></p>
       ${bye}
       <div class="match-grid">${cards}</div>
@@ -446,6 +476,7 @@ function standingsTable(state, ranked, cutoffSize, opts = {}) {
           <td>${colorRibbon(p || {})} ${esc(p ? p.name : '?')}</td>
           ${compact ? '' : `<td class="muted">${esc(p ? p.team : '')}</td>`}
           <td>${s.points}</td>
+          <td>${s.played}</td>
           <td>${s.gdNormal > 0 ? '+' : ''}${s.gdNormal}</td>
           <td>${s.goalsForNormal}</td>
           <td>${s.goalsAgainstNormal}</td>
@@ -454,7 +485,7 @@ function standingsTable(state, ranked, cutoffSize, opts = {}) {
     .join('');
   return `
     <table class="standings ${compact ? 'compact' : ''}">
-      <thead><tr><th>Pos</th><th>Jogador</th>${compact ? '' : '<th>Time</th>'}<th>Pts</th><th>SG</th><th>GP</th><th>GC</th></tr></thead>
+      <thead><tr><th>Pos</th><th>Jogador</th>${compact ? '' : '<th>Time</th>'}<th>Pts</th><th title="Jogos realizados">J</th><th>SG</th><th>GP</th><th>GC</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     ${cutoffSize ? `<div class="cut-legend ${compact ? 'small' : ''}"><span class="dot cut-in"></span> classificado &nbsp; <span class="dot cut-out"></span> eliminado</div>` : ''}`;
@@ -526,7 +557,23 @@ function renderCutoffScreen(state) {
 // hora — é definido pela classificação (protegido por seed, tipo Copa do
 // Mundo), então fica sempre à mostra: nada de animação de sorteio, e as fases
 // futuras aparecem como "a definir" até os vencedores serem conhecidos.
-const BRACKET_UNIT = 110; // px — precisa casar com a altura real de um .bracket-card
+// A altura de cada slot é múltipla de --bracket-unit (CSS var). O valor não é
+// fixo porque a altura real de um card varia com a fase: botão "Em jogo" só
+// aparece em partida pendente, linha de pênaltis só em empate, e o modo
+// operador tem botões que o telão não tem. Por isso a unidade é MEDIDA depois
+// de renderizar (syncBracketUnit) — com valor fixo, os cards da primeira
+// coluna estouravam o slot e encostavam uns nos outros.
+function syncBracketUnit(rootEl) {
+  const tree = rootEl.querySelector('.bracket-tree');
+  if (!tree) return;
+  let tallest = 0;
+  tree.querySelectorAll('.bracket-card, .bracket-tbd').forEach((el) => {
+    tallest = Math.max(tallest, el.offsetHeight);
+  });
+  if (!tallest) return;
+  // + padding vertical do slot (12px) + respiro entre cards vizinhos
+  tree.style.setProperty('--bracket-unit', `${tallest + 20}px`);
+}
 
 function bracketRoundSizes(topSize) {
   const sizes = [];
@@ -573,20 +620,20 @@ function renderBracketTree(state) {
       const real = k.rounds.find((r) => r.size === size);
       const name = real ? real.name : E.bracketStageName(size);
       const matches = real ? real.matches : new Array(size / 2).fill(null);
-      const slotH = BRACKET_UNIT * Math.pow(2, i);
+      const slotUnits = Math.pow(2, i);
       const isFirst = i === 0;
       const isLast = i === lastIdx;
 
       const readonly = state.phase === 'finished' || real !== lastRound;
       const slots = matches
-        .map((m) => `<div class="bracket-slot" style="height:${slotH}px">${bracketSlotHtml(state, m, readonly)}</div>`)
+        .map((m) => `<div class="bracket-slot" style="height:calc(var(--bracket-unit) * ${slotUnits})">${bracketSlotHtml(state, m, readonly)}</div>`)
         .join('');
 
       let vlines = '';
       if (!isLast) {
         for (let p = 0; p < matches.length / 2; p++) {
-          const top = (2 * p + 0.5) * slotH;
-          vlines += `<div class="bracket-vline" style="top:${top}px; height:${slotH}px"></div>`;
+          const top = (2 * p + 0.5) * slotUnits;
+          vlines += `<div class="bracket-vline" style="top:calc(var(--bracket-unit) * ${top}); height:calc(var(--bracket-unit) * ${slotUnits})"></div>`;
         }
       }
 
@@ -598,6 +645,9 @@ function renderBracketTree(state) {
     })
     .join('');
 
+  // O 3º lugar entra como uma coluna extra da árvore, encostada embaixo: é
+  // exatamente onde sobra espaço (embaixo da final) e economiza a altura que
+  // ele custava quando ficava solto embaixo do chaveamento inteiro.
   const thirdPlace = k.thirdPlace
     ? `<div class="bracket-third">
         <div class="bracket-round-title">Disputa de 3º lugar</div>
@@ -605,7 +655,7 @@ function renderBracketTree(state) {
       </div>`
     : '';
 
-  return `<div class="bracket-tree-wrap"><div class="bracket-tree">${cols}</div></div>${thirdPlace}`;
+  return `<div class="bracket-tree-wrap"><div class="bracket-tree">${cols}${thirdPlace}</div></div>`;
 }
 
 function renderKnockout(state, opts = {}) {
@@ -723,7 +773,14 @@ function renderTelao(state) {
   } else if (state.phase === 'finished') {
     content = renderFinished(state);
   }
-  return `<div class="telao-layout">${content}${queueVisible(state) ? renderSidebar(state) : ''}</div>`;
+  // content pode ter mais de um elemento de topo (ex.: champion-panel + árvore
+  // do chaveamento, na tela final) — precisa ficar dentro de um único wrapper,
+  // senão o grid de 2 colunas do telao-layout trata cada elemento como um item
+  // de grid separado e joga o segundo pra coluna da lateral (sobrepondo tudo).
+  const side = queueVisible(state) ? renderSidebar(state) : '';
+  // Sem lateral o grid vira 1 coluna — senão a coluna da lateral continuaria
+  // reservada, comendo 400px de largura à toa (some na tela do campeão).
+  return `<div class="telao-layout ${side ? 'with-side' : ''}"><div class="telao-main">${content}</div>${side}</div>`;
 }
 
 // Fica fixa no canto inferior direito da tela, separada da marca do
@@ -734,14 +791,20 @@ export function render(state, rootEl, uiExtra = {}) {
   const header = renderHeader(state);
   if (state.viewMode === 'telao') {
     rootEl.innerHTML = `${header}<main class="telao">${renderTelao(state)}</main>${cornerLogoHtml}`;
-    return;
+  } else {
+    const showQueue = queueVisible(state);
+    rootEl.innerHTML = `
+      ${header}
+      <main class="operator ${showQueue ? 'with-queue' : ''}">
+        <div class="main-content">${renderOperatorMain(state, uiExtra)}</div>
+        ${showQueue ? `<aside class="sidebar">${renderSidebar(state)}</aside>` : ''}
+      </main>
+      ${cornerLogoHtml}`;
   }
-  const showQueue = queueVisible(state);
-  rootEl.innerHTML = `
-    ${header}
-    <main class="operator ${showQueue ? 'with-queue' : ''}">
-      <div class="main-content">${renderOperatorMain(state, uiExtra)}</div>
-      ${showQueue ? `<aside class="sidebar">${renderSidebar(state)}</aside>` : ''}
-    </main>
-    ${cornerLogoHtml}`;
+  syncBracketUnit(rootEl);
+  // As fontes do Google chegam depois do primeiro paint e mudam a altura real
+  // dos cards — remede quando terminarem de carregar.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => syncBracketUnit(rootEl));
+  }
 }

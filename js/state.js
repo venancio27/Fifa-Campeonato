@@ -95,6 +95,14 @@ export function importStateFromJson(jsonString) {
 }
 
 // ---------- Jogadores ----------
+function normalizeHexColor(value, fallback) {
+  let v = (value || '').trim();
+  if (!v) return fallback;
+  if (!v.startsWith('#')) v = '#' + v;
+  if (/^#[0-9a-fA-F]{3}$/.test(v)) v = '#' + v[1] + v[1] + v[2] + v[2] + v[3] + v[3];
+  return /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : fallback;
+}
+
 function normalizeConfig(state) {
   const options = availableCutoffSizes(state);
   if (options.length && !options.includes(state.config.cutoffSize)) {
@@ -113,8 +121,8 @@ export function addPlayer(state, name, team, color1, color2) {
     id: genId(),
     name: trimmedName,
     team: (team || '').trim(),
-    color1: color1 || '#ff7a1a',
-    color2: color2 || '#1a1a22',
+    color1: normalizeHexColor(color1, '#ff7a1a'),
+    color2: normalizeHexColor(color2, '#1a1a22'),
     seedSalt: Math.random(),
   });
   normalizeConfig(state);
@@ -151,7 +159,13 @@ export function addLatePlayer(state, name, team, color1, color2) {
 
 export function updatePlayer(state, playerId, fields) {
   const p = state.players.find((pl) => pl.id === playerId);
-  if (p) Object.assign(p, fields);
+  if (!p) return state;
+  const next = { ...fields };
+  if (next.name != null) next.name = next.name.trim() || p.name;
+  if (next.team != null) next.team = next.team.trim();
+  if ('color1' in next) next.color1 = normalizeHexColor(next.color1, p.color1);
+  if ('color2' in next) next.color2 = normalizeHexColor(next.color2, p.color2);
+  Object.assign(p, next);
   return state;
 }
 

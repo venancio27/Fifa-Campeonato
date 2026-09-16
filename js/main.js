@@ -1,12 +1,13 @@
 import * as S from './state.js';
 import * as UI from './ui.js';
-import { openScoreModal, openInfoModal } from './modal.js';
+import { openScoreModal, openInfoModal, openPlayerEditModal, openSettingsModal } from './modal.js';
 import { runDrawAnimation } from './wheel.js';
 import { updateTicker } from './ticker.js';
 import { mountHero } from './hero.js';
 
 const appEl = document.getElementById('app');
 let state = S.loadState();
+UI.wireColorInputs(appEl);
 
 // Estado de navegação só de tela (não persiste) — hoje só controla o "voltar
 // pra ver a Rodada 1" a partir da Rodada 2.
@@ -69,30 +70,18 @@ async function revealRound1() {
 }
 
 appEl.addEventListener('submit', (e) => {
-  const addForm = e.target.closest('#add-player-form');
-  const lateForm = e.target.closest('#late-player-form');
-  if (!addForm && !lateForm) return;
+  const form = e.target.closest('#add-player-form');
+  if (!form) return;
   e.preventDefault();
-  const form = addForm || lateForm;
   const nameInput = form.querySelector('input[name="name"]');
-  const teamInput = form.querySelector('input[name="team"]');
-  const color1Input = form.querySelector('input[name="color1"]');
-  const color2Input = form.querySelector('input[name="color2"]');
   const name = nameInput.value;
-  const team = teamInput.value;
-  const color1 = color1Input.value;
-  const color2 = color2Input.value;
   if (!name.trim()) return;
-  if (addForm) {
-    mutate((s) => S.addPlayer(s, name, team, color1, color2));
-  } else {
-    mutate((s) => S.addLatePlayer(s, name, team, color1, color2));
-  }
-  nameInput.value = '';
-  teamInput.value = '';
-  color1Input.value = '#ff7a1a';
-  color2Input.value = '#1a1a22';
-  nameInput.focus();
+  const team = form.querySelector('input[name="team"]').value;
+  const color1 = form.querySelector('input[name="color1"]').value;
+  const color2 = form.querySelector('input[name="color2"]').value;
+  mutate((s) => S.addPlayer(s, name, team, color1, color2));
+  const freshName = appEl.querySelector('#add-player-form input[name="name"]');
+  if (freshName) freshName.focus();
 });
 
 appEl.addEventListener('change', (e) => {
@@ -142,6 +131,26 @@ appEl.addEventListener('click', (e) => {
   switch (action) {
     case 'remove-player':
       mutate((s) => S.removePlayer(s, btn.dataset.id));
+      break;
+
+    case 'edit-player': {
+      const p = S.getPlayer(state, btn.dataset.id);
+      if (!p) break;
+      openPlayerEditModal(p, (fields) => {
+        mutate((s) => S.updatePlayer(s, p.id, fields));
+      });
+      break;
+    }
+
+    case 'open-settings-modal':
+      openSettingsModal(
+        () => state,
+        {
+          onConfig: (fields) => mutate((s) => S.setConfig(s, fields)),
+          onAddLatePlayer: ({ name, team, color1, color2 }) =>
+            mutate((s) => S.addLatePlayer(s, name, team, color1, color2)),
+        }
+      );
       break;
 
     case 'focus-name': {

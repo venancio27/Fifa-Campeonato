@@ -1,4 +1,6 @@
 // Modal de lançamento de placar — auto-contido, igual ao wheel.js.
+import { esc, colorFieldHtml, wireColorInputs } from './ui.js';
+import * as S from './state.js';
 
 // Modal genérico só de leitura (ex.: classificação final congelada da fase
 // de grupos) — mostra o HTML passado e fecha com um botão único.
@@ -126,4 +128,181 @@ export function openScoreModal(match, label1, label2, onSave) {
     onSave({ score1, score2, hasPens, pen1, pen2 });
     close();
   });
+}
+
+// Editar um jogador já cadastrado (nome, time, cores) sem precisar excluir e
+// recadastrar — útil quando só a cor do time mudou.
+export function openPlayerEditModal(player, onSave) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-card">
+      <h3>Editar jogador</h3>
+      <div class="field">
+        <label>Nome</label>
+        <input type="text" id="ep-name" value="${esc(player.name)}" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Time do FIFA</label>
+        <input type="text" id="ep-team" value="${esc(player.team || '')}" autocomplete="off" />
+      </div>
+      <div class="field edit-player-colors">
+        ${colorFieldHtml('color1', 'Cor 1', player.color1)}
+        ${colorFieldHtml('color2', 'Cor 2', player.color2)}
+      </div>
+      <p class="hint error" id="ep-error" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-action="cancel">Cancelar</button>
+        <button type="button" class="btn btn-primary" data-action="save">Salvar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('show'));
+  wireColorInputs(overlay);
+
+  function close() {
+    overlay.classList.remove('show');
+    setTimeout(() => overlay.remove(), 200);
+  }
+
+  overlay.querySelector('[data-action="cancel"]').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+
+  overlay.querySelector('[data-action="save"]').addEventListener('click', () => {
+    const errorEl = overlay.querySelector('#ep-error');
+    errorEl.hidden = true;
+    const name = overlay.querySelector('#ep-name').value;
+    if (!name.trim()) {
+      errorEl.textContent = 'Informe o nome do jogador.';
+      errorEl.hidden = false;
+      return;
+    }
+    const team = overlay.querySelector('#ep-team').value;
+    const color1 = overlay.querySelector('input[name="color1"]').value;
+    const color2 = overlay.querySelector('input[name="color2"]').value;
+    onSave({ name, team, color1, color2 });
+    close();
+  });
+}
+
+function segBtnHtml(key, value, label, active) {
+  return `<button type="button" class="seg-btn ${active ? 'active' : ''}" data-setting="${key}" data-value="${esc(String(value))}">${esc(label)}</button>`;
+}
+
+// Só as seções que fazem sentido na fase atual. Essa parte é re-renderizada a
+// cada escolha (mudar "ponto fixo/duelo" troca o subcampo que aparece embaixo).
+function configSectionsHtml(state) {
+  const cfg = state.config;
+  const cutoffOptions = S.availableCutoffSizes(state);
+  const showOdd = state.phase === 'round1' && state.round1 && !!state.round1.byePlayerId;
+  const parts = [];
+
+  if (cutoffOptions.length > 1) {
+    parts.push(`
+      <div class="field">
+        <label>Corte pro mata-mata</label>
+        <div class="segmented small">
+          ${cutoffOptions.map((v) => segBtnHtml('cutoffSize', v, `Top ${v}`, cfg.cutoffSize === v)).join('')}
+        </div>
+        <p class="hint">Quantos jogadores avançam da fase de grupos. Dá pra mudar até o chaveamento ser gerado.</p>
+      </div>`);
+  }
+
+  if (showOdd) {
+    parts.push(`
+      <div class="field">
+        <label>Tratamento do número ímpar (${state.players.length} jogadores)</label>
+        <div class="segmented small">
+          ${segBtnHtml('oddHandling', 'fixed', 'Ponto fixo', cfg.oddHandling === 'fixed')}
+          ${segBtnHtml('oddHandling', 'duel', 'Duelo dos folguistas', cfg.oddHandling === 'duel')}
+        </div>
+        ${
+          cfg.oddHandling === 'fixed'
+            ? `<div class="subfield">
+                <label>Pontos de folga</label>
+                <div class="segmented small">
+                  ${segBtnHtml('fixedByePoints', 1, '1 ponto', cfg.fixedByePoints === 1)}
+                  ${segBtnHtml('fixedByePoints', 2, '2 pontos', cfg.fixedByePoints === 2)}
+                </div>
+              </div>`
+            : `<p class="hint locked">🔒 Com "duelo dos folguistas", a classificação fica travada em <strong>Soma R1+R2</strong>.</p>`
+        }
+      </div>`);
+  }
+
+  return parts.join('') || '<p class="hint">Nada pra ajustar nesta fase.</p>';
+}
+
+function lateSectionHtml(state) {
+  if (!S.canAddLatePlayer(state)) return '';
+  return `
+    <div class="field">
+      <label>🏃 Jogador chegou atrasado?</label>
+      <form id="settings-late-form" class="add-player-form">
+        <input type="text" name="name" placeholder="Nome do jogador" autocomplete="off" required />
+        <input type="text" name="team" placeholder="Time do FIFA" autocomplete="off" />
+        ${colorFieldHtml('color1', 'Cor 1', '#ff7a1a')}
+        ${colorFieldHtml('color2', 'Cor 2', '#1a1a22')}
+        <button type="submit" class="btn btn-primary">Encaixar na Rodada 1</button>
+      </form>
+      <p class="hint">Se já havia folguista, ele encara o recém-chegado num confronto real. Se não havia, o recém-chegado vira o folguista da rodada.</p>
+    </div>`;
+}
+
+// Popup único de ajustes do operador (ícone ⚙ no título da rodada): corte do
+// mata-mata, número ímpar e cadastro tardio. getState é uma função porque o app
+// re-renderiza a cada mudança — o modal precisa sempre ler o estado atual.
+export function openSettingsModal(getState, handlers) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-card modal-card-settings">
+      <h3>Configurações da rodada</h3>
+      <div id="settings-sections">${configSectionsHtml(getState())}</div>
+      ${lateSectionHtml(getState())}
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-action="close">Fechar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('show'));
+  wireColorInputs(overlay);
+
+  function close() {
+    overlay.classList.remove('show');
+    setTimeout(() => overlay.remove(), 200);
+  }
+
+  overlay.querySelector('[data-action="close"]').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+
+  const sections = overlay.querySelector('#settings-sections');
+  sections.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-setting]');
+    if (!btn) return;
+    const key = btn.dataset.setting;
+    const raw = btn.dataset.value;
+    handlers.onConfig({ [key]: key === 'oddHandling' ? raw : Number(raw) });
+    sections.innerHTML = configSectionsHtml(getState());
+  });
+
+  const lateForm = overlay.querySelector('#settings-late-form');
+  if (lateForm) {
+    lateForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = lateForm.querySelector('input[name="name"]').value;
+      if (!name.trim()) return;
+      handlers.onAddLatePlayer({
+        name,
+        team: lateForm.querySelector('input[name="team"]').value,
+        color1: lateForm.querySelector('input[name="color1"]').value,
+        color2: lateForm.querySelector('input[name="color2"]').value,
+      });
+      close();
+    });
+  }
 }
