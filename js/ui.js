@@ -173,6 +173,39 @@ function teamFieldHtml() {
     </label>`;
 }
 
+// A capa da tela de cadastro. Segue a linguagem da landing page da igreja:
+// pombo de fogo grande flutuando, brilho radial por trás e faíscas subindo
+// (essas vêm do canvas, animado em hero.js). Só a Rodada 0 tem isso — depois
+// que o campeonato começa, a tela vira ferramenta de operação.
+function renderCoverHero(state) {
+  const n = state.players.length;
+  return `
+    <section class="hero-cover">
+      <canvas class="hero-embers" aria-hidden="true"></canvas>
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <div class="hero-eyebrow">
+            <img src="assets/logo-viva-mark.png" alt="" aria-hidden="true" />
+            Campeonato FIFA · NextGen
+          </div>
+          <h1 class="hero-title">Cadastro de <span class="flame-text">jogadores.</span><br />A noite começa <span class="flame-text">aqui.</span></h1>
+          <p class="hero-lead">
+            Coloque todo mundo na lista com o time e as cores. Quando a chave fechar,
+            o sorteio da Rodada 1 abre a noite.
+          </p>
+          <div class="hero-ctas">
+            <button class="btn btn-primary btn-pill" data-action="focus-name">Cadastrar jogador ➜</button>
+            <div class="hero-count"><strong>${n}</strong> ${n === 1 ? 'jogador na lista' : 'jogadores na lista'}</div>
+          </div>
+        </div>
+        <div class="hero-mark">
+          <div class="hero-glow" aria-hidden="true"></div>
+          <img src="assets/logo-viva-mark.png" alt="Igreja Viva" />
+        </div>
+      </div>
+    </section>`;
+}
+
 function renderRegistration(state) {
   const players = state.players
     .map(
@@ -191,8 +224,9 @@ function renderRegistration(state) {
   const canStart = S.canStartTournament(state);
 
   return `
+    ${renderCoverHero(state)}
     <section class="panel">
-      <h2>Cadastro de jogadores</h2>
+      <h2>Lista de jogadores</h2>
       <form id="add-player-form" class="add-player-form">
         <input type="text" name="name" placeholder="Nome do jogador" autocomplete="off" required />
         ${teamFieldHtml()}
