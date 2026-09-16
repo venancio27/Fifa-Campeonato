@@ -77,21 +77,24 @@ body.has-ticker .brand-logo-corner { bottom: 52px; }
 
 main.operator {
   padding: 20px;
-  max-width: 1200px;
+  max-width: 1500px;
   margin: 0 auto;
 }
 main.operator.with-queue {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: 1fr 360px;
   gap: 20px;
   align-items: start;
 }
 .sidebar { position: sticky; top: 78px; }
-main.telao { padding: 28px; max-width: 1400px; margin: 0 auto; }
-.telao-layout { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+/* O telão roda numa TV grande — vale usar a largura toda que der, senão o
+   chaveamento fica espremido no meio da tela com margem sobrando dos dois lados. */
+main.telao { padding: 28px; max-width: 1900px; margin: 0 auto; }
+.telao-layout { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
+.telao-layout.with-side { grid-template-columns: 1fr 400px; }
 
 @media (max-width: 860px) {
-  main.operator.with-queue, .telao-layout { grid-template-columns: 1fr; }
+  main.operator.with-queue, .telao-layout.with-side { grid-template-columns: 1fr; }
   .sidebar { position: static; }
 }
 
@@ -143,8 +146,26 @@ main.telao { padding: 28px; max-width: 1400px; margin: 0 auto; }
 }
 .add-player-form input:focus { outline: none; border-color: var(--flame-1); }
 
-.color-field { flex: 0 0 auto; }
-.color-field input[type="color"] {
+.color-field { flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; }
+.color-field-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.color-input-group { display: flex; align-items: center; gap: 6px; }
+/* O campo hex funciona sozinho em qualquer contexto (form inline ou modal);
+   dentro do .add-player-form ele só precisa vencer o "flex:1" genérico dos
+   outros inputs do form pra não esticar. */
+.color-hex-input {
+  width: 100px;
+  min-width: 0;
+  background: var(--bg-card-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 12px;
+  color: var(--text);
+  font-family: 'Poppins', sans-serif;
+  text-transform: lowercase;
+}
+.color-hex-input:focus { outline: none; border-color: var(--flame-1); }
+.add-player-form .color-hex-input { flex: none; }
+.color-swatch-input {
   flex: none;
   width: 42px;
   min-width: 0;
@@ -281,23 +302,35 @@ main.telao { padding: 28px; max-width: 1400px; margin: 0 auto; }
   .hero-embers { display: none; }
 }
 
-/* ---------- ribbon de cores do time (detalhe, não escudo) ---------- */
-.color-ribbon, .reel-ribbon, .draw-ribbon, .ticker-ribbon {
-  display: inline-flex;
+/* ---------- bandeirinha de cores do time (detalhe, não escudo) ---------- */
+/* Faixa diagonal Cor 1 - Cor 2 - Cor 1, formato horizontal de bandeira. O
+   gradiente é aplicado inline (ver colorRibbon em ui.js). */
+.color-ribbon, .reel-ribbon, .draw-ribbon, .ticker-ribbon, .champion-ribbon {
+  display: inline-block;
   flex-shrink: 0;
   overflow: hidden;
   border-radius: 3px;
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
-.color-ribbon span, .reel-ribbon span, .draw-ribbon span, .ticker-ribbon span { flex: 1; }
-.color-ribbon { width: 12px; height: 20px; }
-.reel-ribbon { width: 14px; height: 32px; }
-.draw-ribbon { width: 14px; height: 28px; }
-.ticker-ribbon { width: 6px; height: 13px; margin: 0 1px; vertical-align: middle; }
+.color-ribbon { width: 26px; height: 16px; }
+.reel-ribbon { width: 36px; height: 20px; }
+.draw-ribbon { width: 32px; height: 18px; }
+.ticker-ribbon { width: 15px; height: 9px; margin: 0 2px; vertical-align: middle; }
 .player-count { color: var(--muted); font-size: 0.85rem; }
 
 .field { margin-bottom: 18px; }
 .field > label { display: block; font-weight: 600; margin-bottom: 8px; }
+.field input[type="text"]:not(.color-hex-input) {
+  width: 100%;
+  background: var(--bg-card-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 14px;
+  color: var(--text);
+  font-family: 'Poppins', sans-serif;
+}
+.field input[type="text"]:not(.color-hex-input):focus { outline: none; border-color: var(--flame-1); }
+.edit-player-colors { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
 .subfield { margin-top: 12px; }
 .checkbox { display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer; }
 .checkbox input { width: 18px; height: 18px; accent-color: var(--flame-1); }
@@ -317,8 +350,14 @@ main.telao { padding: 28px; max-width: 1400px; margin: 0 auto; }
 .seg-btn.active { background: var(--flame-gradient); color: #1a0a00; border-color: transparent; }
 
 /* ---------- matches ---------- */
-.match-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; margin-bottom: 16px; }
+/* Flexbox (não grid) de propósito: com grid, uma última linha incompleta
+   deixa espaço vazio (as colunas são fixas pra todo o grid). Com flex-wrap,
+   os cards da última linha crescem (flex-grow) pra preencher o espaço que
+   sobra nessa linha específica. */
+.match-grid { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
 .match-card {
+  flex: 1 1 270px;
+  max-width: 420px; /* trava o crescimento de um card sozinho numa linha, pra não ficar desproporcional aos outros */
   background: var(--bg-card-2);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -346,10 +385,6 @@ main.telao { padding: 28px; max-width: 1400px; margin: 0 auto; }
 .badge-done { background: rgba(51, 193, 125, 0.15); color: var(--success); }
 
 .bye-card { background: rgba(139, 63, 240, 0.1); border: 1px solid rgba(139, 63, 240, 0.3); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
-
-.late-arrival { border: 1px dashed var(--border); border-radius: 12px; padding: 14px; margin: 6px 0 16px; }
-.late-arrival-title { font-weight: 700; margin-bottom: 10px; }
-.late-arrival .add-player-form { margin-bottom: 8px; }
 
 @keyframes pulse-border {
   0%, 100% { box-shadow: 0 0 0 1px var(--flame-1), 0 0 14px rgba(255, 122, 26, 0.2); }
@@ -397,11 +432,14 @@ main.telao { padding: 28px; max-width: 1400px; margin: 0 auto; }
 
 /* tabela de classificação compacta (usa a mesma .standings, só encolhida) */
 .standings.compact { table-layout: fixed; }
-.standings.compact th, .standings.compact td { padding: 6px 4px; font-size: 0.78rem; }
-.standings.compact th:nth-child(2), .standings.compact td:nth-child(2) { width: auto; text-align: left; padding-right: 8px; }
-.standings.compact th:not(:nth-child(2)), .standings.compact td:not(:nth-child(2)) { width: 28px; text-align: center; padding-left: 3px; padding-right: 3px; }
+.standings.compact th, .standings.compact td { padding: 7px 4px; font-size: 0.78rem; }
+.standings.compact th:nth-child(2), .standings.compact td:nth-child(2) { width: auto; text-align: left; padding-right: 10px; }
+.standings.compact th:not(:nth-child(2)), .standings.compact td:not(:nth-child(2)) { width: 30px; text-align: center; padding-left: 3px; padding-right: 3px; }
+/* a coluna "Pos" encosta no "Jogador" se for do mesmo tamanho das numéricas —
+   o cabeçalho "POS" sozinho já ocupa quase os 30px. */
+.standings.compact th:first-child, .standings.compact td:first-child { width: 38px; text-align: left; padding-left: 2px; padding-right: 8px; }
 .standings.compact td:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.standings.compact .color-ribbon { width: 8px; height: 14px; margin-right: 4px; }
+.standings.compact .color-ribbon { width: 18px; height: 11px; margin-right: 4px; }
 
 /* ---------- ícone pra reabrir a classificação final congelada ---------- */
 .btn-icon-standings {
@@ -421,8 +459,11 @@ main.telao { padding: 28px; max-width: 1400px; margin: 0 auto; }
 .bracket-round-title { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.04em; color: var(--flame-3); margin-bottom: 10px; font-size: 1.1rem; white-space: nowrap; }
 
 .bracket-tree-wrap { overflow-x: auto; padding-bottom: 8px; margin-bottom: 20px; display: flex; justify-content: center; }
-.bracket-tree { display: flex; align-items: flex-start; gap: 36px; width: max-content; margin: 0 auto; }
-.bracket-round { flex: 0 0 auto; width: 250px; }
+/* --bracket-unit é a altura de um slot da primeira coluna; ui.js sobrescreve
+   com a altura real medida do card. O valor aqui é só o fallback do 1º paint. */
+.bracket-tree { display: flex; align-items: flex-start; gap: 36px; width: max-content; margin: 0 auto; --bracket-unit: 120px; }
+.bracket-round { flex: 0 0 auto; width: 300px; }
+main.telao .bracket-round { width: 380px; }
 .bracket-round-body { position: relative; }
 
 .bracket-slot { position: relative; box-sizing: border-box; padding: 6px 0; display: flex; align-items: center; }
@@ -470,14 +511,17 @@ main.telao { padding: 28px; max-width: 1400px; margin: 0 auto; }
 .bracket-card-foot { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
 .bracket-card-foot .btn-sm { padding: 4px 9px; font-size: 0.72rem; }
 
-.bracket-third { margin: 0 auto 20px; max-width: 320px; }
+/* coluna extra da árvore, alinhada embaixo (ver renderBracketTree) */
+.bracket-third { flex: 0 0 auto; width: 300px; align-self: flex-end; }
+main.telao .bracket-third { width: 380px; }
+.bracket-third .match-card { max-width: none; }
 
 /* ---------- champion ---------- */
 .champion-panel { text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
 .champion-badge { font-size: 4rem; }
 .champion-panel h1 { font-size: 2.6rem; background: var(--flame-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .champion-name-row { display: flex; align-items: center; justify-content: center; gap: 14px; }
-.champion-ribbon { width: 20px; height: 46px; }
+.champion-ribbon { width: 56px; height: 32px; }
 .champion-name { font-family: 'Bebas Neue', sans-serif; font-size: 3.2rem; letter-spacing: 0.03em; }
 .champion-team { color: var(--muted); font-size: 1.2rem; }
 .champion-bar { position: absolute; left: 0; right: 0; height: 8px; }
@@ -492,9 +536,16 @@ main.telao { padding: 28px; max-width: 1400px; margin: 0 auto; }
 main.telao [data-action] { pointer-events: none; opacity: 0.45; }
 main.telao .panel h1, main.telao .panel h2 { font-size: 2rem; }
 .telao-wait { text-align: center; padding: 80px 24px; }
-.telao-grid .match-card { font-size: 1.1rem; }
+.telao-grid .match-card { flex-basis: 360px; max-width: 460px; font-size: 1.1rem; }
 .telao .mc-name { font-size: 1.15rem; }
 .telao .mc-score { font-size: 1.6rem; }
+/* Na tela do campeão o telão mostra o pódio E o chaveamento inteiro — o painel
+   do campeão precisa ser mais baixo aqui pra sobrar altura pra árvore. */
+main.telao .champion-panel { padding: 26px 24px; margin-bottom: 14px; }
+main.telao .champion-badge { font-size: 2.4rem; }
+main.telao .champion-name { font-size: 2.4rem; }
+main.telao .champion-ribbon { width: 44px; height: 25px; }
+main.telao .champion-team { font-size: 1rem; }
 
 /* ---------- draw overlay (wheel.js) ---------- */
 .draw-overlay, .modal-overlay {
@@ -626,6 +677,18 @@ body.has-ticker main { padding-bottom: 56px; }
 
 /* ---------- score modal ---------- */
 .modal-card { max-width: 420px; text-align: center; }
+.modal-card-settings { max-width: 600px; text-align: left; }
+.modal-card-settings h3 { text-align: center; margin-bottom: 18px; }
+/* separador entre seções — o form de atrasado fica fora de #settings-sections,
+   por isso as duas regras (irmão dentro do bloco, e filho direto do card) */
+.modal-card-settings .field + .field,
+.modal-card-settings > .field { border-top: 1px solid var(--border); padding-top: 16px; }
+.modal-card-settings .field:last-of-type { margin-bottom: 0; }
+.modal-card-settings .field .hint { margin-bottom: 0; }
+/* o botão de envio ocupa a linha toda — senão encaixa do lado do campo de cor
+   e o form fica com cara de quebrado */
+.modal-card-settings #settings-late-form .btn { flex: 1 0 100%; }
+.modal-card-settings .modal-actions { justify-content: center; }
 .modal-card-wide { max-width: 900px; text-align: left; }
 .modal-card-wide h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.03em; color: var(--flame-3); margin: 0 0 14px; text-align: center; }
 .recap-block { margin-bottom: 22px; }
