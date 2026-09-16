@@ -3,6 +3,7 @@ import * as UI from './ui.js';
 import { openScoreModal, openInfoModal } from './modal.js';
 import { runDrawAnimation } from './wheel.js';
 import { updateTicker } from './ticker.js';
+import { mountHero } from './hero.js';
 
 const appEl = document.getElementById('app');
 let state = S.loadState();
@@ -14,6 +15,7 @@ const uiExtra = { showRound1Recap: false };
 function rerender() {
   UI.render(state, appEl, uiExtra);
   updateTicker(state);
+  mountHero(appEl);
 }
 function persistAndRerender() {
   S.saveState(state);
@@ -141,6 +143,15 @@ appEl.addEventListener('click', (e) => {
     case 'remove-player':
       mutate((s) => S.removePlayer(s, btn.dataset.id));
       break;
+
+    case 'focus-name': {
+      const input = appEl.querySelector('#add-player-form input[name="name"]');
+      if (input) {
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        input.focus({ preventScroll: true });
+      }
+      break;
+    }
 
     case 'goto-config':
       mutate((s) => S.goToConfig(s));

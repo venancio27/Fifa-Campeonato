@@ -163,6 +163,124 @@ main.telao { padding: 28px; max-width: 1400px; margin: 0 auto; }
 .p-team { color: var(--muted); font-size: 0.9rem; }
 .player-list .empty { color: var(--muted); padding: 12px 6px; }
 
+/* ---------- capa da tela de cadastro ---------- */
+/* Mesma receita da landing page da igreja: brilho radial quente por trás de
+   uma marca grande que flutua, faíscas subindo no canvas e tipografia com
+   gradiente de fogo. Só aparece na fase de cadastro. */
+.hero-cover {
+  position: relative;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  min-height: 55vh;
+  padding: 46px 34px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background:
+    radial-gradient(ellipse 760px 460px at 78% 10%, rgba(255, 140, 40, 0.17), transparent 60%),
+    radial-gradient(ellipse 620px 420px at 4% 100%, rgba(194, 54, 12, 0.16), transparent 55%),
+    linear-gradient(165deg, #17110b, #0b0908);
+}
+/* width/height explícitos: <canvas> é replaced element, então `inset: 0`
+   sozinho não o estica — ele assumiria a largura do atributo `width`, que o
+   hero.js calcula a partir do offsetWidth (laço de realimentação em telas
+   retina: 300 -> 600 -> 1200...). */
+.hero-embers {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.hero-inner {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  align-items: center;
+  gap: 36px;
+  width: 100%;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  color: var(--flame-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.hero-eyebrow img {
+  flex-shrink: 0;
+  height: 22px;
+  width: auto;
+  filter: drop-shadow(0 0 8px rgba(255, 138, 31, 0.55));
+}
+
+.hero-title {
+  margin: 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2.4rem, 5.4vw, 4.2rem);
+  line-height: 0.98;
+  letter-spacing: 0.02em;
+}
+.flame-text {
+  background: linear-gradient(100deg, var(--flame-3) 8%, var(--flame-2) 70%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-lead {
+  max-width: 46ch;
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.hero-ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: 30px; }
+.btn-pill { border-radius: 100px; padding: 13px 24px; }
+.hero-count { display: inline-flex; align-items: baseline; gap: 8px; color: var(--muted); font-size: 0.9rem; }
+.hero-count strong { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 0.04em; color: var(--text); }
+
+.hero-mark { position: relative; display: flex; align-items: center; justify-content: center; }
+.hero-mark .hero-glow {
+  position: absolute;
+  z-index: 0;
+  width: 420px;
+  max-width: 130%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, rgba(255, 138, 31, 0.38), transparent 68%);
+  filter: blur(10px);
+}
+.hero-mark img {
+  position: relative;
+  z-index: 1;
+  width: min(300px, 82%);
+  height: auto;
+  filter: drop-shadow(0 26px 54px rgba(255, 90, 31, 0.32)) drop-shadow(0 0 30px rgba(255, 170, 70, 0.2));
+}
+
+@media (max-width: 860px) {
+  .hero-cover { min-height: 0; padding: 32px 22px; }
+  .hero-inner { grid-template-columns: 1fr; gap: 24px; }
+  .hero-mark { order: -1; }
+  .hero-mark img { width: 190px; }
+  .hero-mark .hero-glow { width: 260px; }
+  .hero-lead { max-width: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-embers { display: none; }
+}
+
 /* ---------- ribbon de cores do time (detalhe, não escudo) ---------- */
 .color-ribbon, .reel-ribbon, .draw-ribbon, .ticker-ribbon {
   display: inline-flex;
