@@ -709,6 +709,105 @@ function renderFinished(state) {
     ${renderBracketTree(state)}`;
 }
 
+// ---------- Regulamento ----------
+// Disponível em qualquer fase pelo botão do cabeçalho. A numeração (1 a 18) é
+// a mesma do regulamento combinado com os jogadores, pra dar pra citar "regra
+// 9" numa discussão no meio da noite sem ambiguidade.
+export function rulesModalHtml() {
+  return `
+    <h3>📖 Regras do Campeonato de FIFA</h3>
+    <div class="rules-body">
+
+      <div class="rules-section">
+        <div class="rules-section-title">Cadastro e times</div>
+        <ol class="rules-list">
+          <li>Cada jogador se inscreve com <strong>nome + time do FIFA</strong> que vai usar.</li>
+          <li>O time escolhido vale pro campeonato inteiro — <strong>sem trocar de time</strong> durante o campeonato.</li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Formato</div>
+        <ol class="rules-list" start="3">
+          <li>O formato do campeonato será <strong>definido no dia, por votação</strong> entre os inscritos, assim que soubermos o número exato de participantes. Vence a opção mais votada; em caso de empate, o voto do organizador desempata.</li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Pontuação e desempate <span class="rules-note">(fase de grupos, se houver)</span></div>
+        <ol class="rules-list" start="4">
+          <li>
+            Pontuação por partida:
+            <table class="rules-table">
+              <tr><td>Vitória no tempo normal</td><td><strong>3</strong></td></tr>
+              <tr><td>Vitória nos pênaltis</td><td><strong>2</strong></td></tr>
+              <tr><td>Derrota nos pênaltis</td><td><strong>1</strong></td></tr>
+              <tr><td>Derrota no tempo normal</td><td><strong>0</strong></td></tr>
+            </table>
+          </li>
+          <li>
+            Desempate na classificação, <strong>nesta ordem</strong>:
+            <ol class="rules-sublist">
+              <li>Pontos totais</li>
+              <li>Saldo de gols <strong>no tempo normal</strong></li>
+              <li>Gols marcados no tempo normal</li>
+              <li>Confronto direto (se os dois jogaram entre si)</li>
+              <li>Saldo de gols nos pênaltis</li>
+              <li>Gols marcados nos pênaltis</li>
+              <li>Sorteio</li>
+            </ol>
+            <p class="rules-why">Os pênaltis ficam por último de propósito: o resultado do pênalti já virou ponto na regra 4, então contá-lo de novo no saldo pesaria duas vezes.</p>
+          </li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Tempo de jogo</div>
+        <ol class="rules-list" start="6">
+          <li>Rodadas 1 e 2 (se houver fase de grupos): <strong>4 minutos</strong> por tempo.</li>
+          <li>A partir das quartas de final: <strong>5 minutos</strong> por tempo.</li>
+          <li>Empatou depois do tempo normal → <strong>pênaltis</strong>.</li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Paradas durante a partida <span class="rules-note">(a cota é de cada jogador; cada parada de até 30s)</span></div>
+        <ol class="rules-list" start="9">
+          <li>Fase de grupos e quartas de final: <strong>1 parada por jogador</strong>.</li>
+          <li>A partir das semifinais: <strong>2 paradas por jogador</strong>.</li>
+          <li>Na final: <strong>3 paradas por jogador</strong>.</li>
+          <li>Se um jogador <strong>se machucar</strong>, a parada não entra na cota — é à parte, sem limite.</li>
+        </ol>
+        <p class="rules-why">Cada um gasta a sua: assim ninguém queima a cota do adversário pausando de propósito.</p>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Montagem do time</div>
+        <ol class="rules-list" start="13">
+          <li>Rodada 1: até <strong>2 minutos</strong> para montagem do time antes da partida.</li>
+          <li>A partir da segunda rodada: até <strong>1 minuto</strong>.</li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Ausência (W.O.)</div>
+        <ol class="rules-list" start="15">
+          <li>Se o jogador for chamado e não aparecer em até <strong>3 minutos</strong>, perde a partida por W.O.</li>
+          <li>Exceção: em caso extremo, com justificativa (ex.: saiu pra comprar algo pro evento), o W.O. pode ser cancelado se pelo menos <strong>metade + 1</strong> das pessoas presentes concordarem com a justificativa <em>e</em> concordarem em alterar a ordem das partidas.</li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Outras</div>
+        <ol class="rules-list" start="17">
+          <li>Problema técnico do console/controle <strong>não conta</strong> na cota de paradas — igual à regra de lesão.</li>
+          <li>Regras excepcionais podem ser adicionadas e acordadas no decorrer da competição, apenas em caso de trazer maior dinamicidade ao campeonato. Para ser aprovada, precisa de pelo menos <strong>2/3 dos votantes</strong>.</li>
+        </ol>
+      </div>
+
+    </div>`;
+}
+
 // ---------- Header / shell ----------
 function renderHeader(state) {
   const isOperator = state.viewMode === 'operator';
@@ -719,6 +818,7 @@ function renderHeader(state) {
         <div class="brand-title">Campeonato FIFA VIVA 2026</div>
       </div>
       <div class="header-actions">
+        <button class="btn btn-ghost" data-action="show-rules" title="Ver o regulamento do campeonato">📖 Regras</button>
         <button class="btn btn-ghost" data-action="toggle-view">${isOperator ? '📺 Modo Telão' : '🛠 Modo Operador'}</button>
         ${
           isOperator

@@ -20,7 +20,15 @@ export function openInfoModal(bodyHtml) {
   function close() {
     overlay.classList.remove('show');
     setTimeout(() => overlay.remove(), 200);
+    document.removeEventListener('keydown', onKey);
   }
+  // Esc fecha: o regulamento é consultado no meio da noite, com o organizador
+  // de mão ocupada — tirar a mão do teclado pra achar o botão atrapalha.
+  function onKey(e) {
+    if (e.key === 'Escape') close();
+  }
+  document.addEventListener('keydown', onKey);
+
   overlay.querySelector('[data-action="close"]').addEventListener('click', close);
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) close();

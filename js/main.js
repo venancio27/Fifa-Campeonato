@@ -120,7 +120,7 @@ appEl.addEventListener('change', (e) => {
   }
 });
 
-const TELAO_ALLOWED_ACTIONS = new Set(['toggle-view', 'reset-all', 'download-backup', 'trigger-upload-backup']);
+const TELAO_ALLOWED_ACTIONS = new Set(['toggle-view', 'reset-all', 'download-backup', 'trigger-upload-backup', 'show-rules']);
 
 appEl.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
@@ -192,6 +192,10 @@ appEl.addEventListener('click', (e) => {
 
     case 'reveal-round1':
       revealRound1();
+      break;
+
+    case 'show-rules':
+      openInfoModal(UI.rulesModalHtml());
       break;
 
     case 'show-final-standings':
