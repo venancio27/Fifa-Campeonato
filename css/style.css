@@ -691,6 +691,41 @@ body.has-ticker main { padding-bottom: 56px; }
 .modal-card-settings .modal-actions { justify-content: center; }
 .modal-card-wide { max-width: 900px; text-align: left; }
 .modal-card-wide h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.03em; color: var(--flame-3); margin: 0 0 14px; text-align: center; }
+/* ---------- evidencia de sorteio / repescagem na classificacao ---------- */
+.draw-mark, .rep-mark { margin-left: 6px; font-size: 0.85em; cursor: help; }
+.standings tr.by-draw td { background: rgba(255, 203, 5, 0.06); }
+.repechage-block { margin: 4px 0 16px; max-width: 420px; }
+.draw-note {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 203, 5, 0.32);
+  border-radius: 10px;
+  background: rgba(255, 203, 5, 0.06);
+  font-size: 0.85rem;
+}
+.draw-note-title { font-weight: 700; color: var(--yellow); margin-bottom: 6px; }
+.draw-note.rep-note { border-color: rgba(255, 122, 26, 0.34); background: rgba(255, 122, 26, 0.07); margin-bottom: 10px; }
+.draw-note.rep-note .draw-note-title { color: var(--flame-3); }
+.draw-note p { margin: 0 0 6px; color: var(--muted); line-height: 1.5; }
+.draw-note ul { margin: 0; padding-left: 20px; color: var(--text); }
+.draw-note li { margin-bottom: 3px; }
+
+/* ---------- rodada travada pela repescagem ---------- */
+.round-locked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 122, 26, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 122, 26, 0.06);
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+.round-locked span { flex: 1; min-width: 220px; }
+
 /* ---------- regulamento ---------- */
 /* O corpo tem rolagem própria em vez de deixar o card inteiro rolar: assim o
    botão "Fechar" não foge pro fim de um documento de 18 regras. */

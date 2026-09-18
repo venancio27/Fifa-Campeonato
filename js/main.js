@@ -33,7 +33,10 @@ function playersPool() {
 
 function findMatch(matchId) {
   const pools = [];
-  if (state.round1) pools.push(state.round1.matches);
+  if (state.round1) {
+    pools.push(state.round1.matches);
+    if (state.round1.repechageMatch) pools.push([state.round1.repechageMatch]);
+  }
   if (state.round2) {
     pools.push(state.round2.matches);
     if (state.round2.byeDuelMatch) pools.push([state.round2.byeDuelMatch]);
@@ -67,6 +70,35 @@ async function revealRound1() {
   }
   await runDrawAnimation({ items, playersPool: playersPool(), caption: 'Sorteio · Rodada 1' });
   mutate((s) => (s.reveal.round1 = true));
+}
+
+// Fecha a fase de grupos. Se alguma faixa empatou em TODOS os critérios da
+// regra 5, o desempate é sorteado aqui, na frente de todo mundo, uma faixa por
+// vez — em vez de sair calado do número que cada jogador recebeu no cadastro.
+// Só depois da animação o resultado é gravado e a classificação congela.
+async function runTiebreakDraws() {
+  const plan = S.planTiebreakDraw(state);
+  for (const group of plan) {
+    const faixa = group.from === group.to ? `${group.from}º` : `${group.from}º ao ${group.to}º`;
+    await runDrawAnimation({
+      items: group.order.map((id, i) => ({
+        kind: 'draw',
+        title: `${group.from + i}º lugar`,
+        player: playerRef(id),
+      })),
+      // O reel gira só entre os empatados da faixa — fica claro que o sorteio
+      // é entre eles, e não entre o campeonato inteiro.
+      playersPool: group.playerIds.map(playerRef),
+      caption: `🎲 Sorteio de desempate · ${faixa}`,
+      nextLabel: 'Sortear próxima posição ➜',
+    });
+  }
+  if (plan.length) mutate((s) => S.applyTiebreakDraw(s, plan));
+}
+
+async function closeGroupStage() {
+  await runTiebreakDraws();
+  mutate((s) => S.advanceToCutoff(s));
 }
 
 appEl.addEventListener('submit', (e) => {
@@ -120,7 +152,10 @@ appEl.addEventListener('change', (e) => {
   }
 });
 
-const TELAO_ALLOWED_ACTIONS = new Set(['toggle-view', 'reset-all', 'download-backup', 'trigger-upload-backup', 'show-rules']);
+// O telão é inerte de propósito: fora trocar de modo e consultar as regras, só
+// passam as ações de backup (cujos botões, como o "Reiniciar tudo", nem chegam
+// a ser renderizados nesse modo).
+const TELAO_ALLOWED_ACTIONS = new Set(['toggle-view', 'download-backup', 'trigger-upload-backup', 'show-rules']);
 
 appEl.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
@@ -172,6 +207,27 @@ appEl.addEventListener('click', (e) => {
 
     case 'set-cutoff':
       mutate((s) => S.setConfig(s, { cutoffSize: Number(btn.dataset.value) }));
+      break;
+
+    case 'set-group-rounds': {
+      const rounds = Number(btn.dataset.value);
+      // Ao entrar na rodada única, a repescagem vira o padrão pro número ímpar
+      // (é a razão de ela existir: o folguista joga em vez de ganhar de graça).
+      const extra = rounds === 1 ? { oddHandling: 'repechage' } : {};
+      mutate((s) => S.setConfig(s, { groupRounds: rounds, ...extra }));
+      break;
+    }
+
+    case 'cancel-repechage':
+      if (confirm('Isso reabre a rodada para corrigir placares e descarta a repescagem já definida (inclusive o placar dela, se houver). O sorteio de desempate não é refeito. Continuar?')) {
+        mutate((s) => S.cancelRepechage(s));
+      }
+      break;
+
+    case 'create-repechage':
+      // O sorteio de desempate roda ANTES de escolher o desafiado: quem ocupa
+      // a última vaga só está definido depois que a faixa empatada é sorteada.
+      runTiebreakDraws().then(() => mutate((s) => S.createRepechage(s)));
       break;
 
     case 'set-classification':
@@ -235,7 +291,7 @@ appEl.addEventListener('click', (e) => {
 
     case 'advance-cutoff':
       uiExtra.showRound1Recap = false;
-      mutate((s) => S.advanceToCutoff(s));
+      closeGroupStage();
       break;
 
     case 'generate-bracket':

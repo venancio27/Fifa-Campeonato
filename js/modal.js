@@ -219,13 +219,19 @@ function configSectionsHtml(state) {
   }
 
   if (showOdd) {
+    // Rodada única não tem segundo folguista pra duelar — só o ponto fixo.
+    const single = cfg.groupRounds === 1;
     parts.push(`
       <div class="field">
         <label>Tratamento do número ímpar (${state.players.length} jogadores)</label>
-        <div class="segmented small">
+        ${
+          single
+            ? ''
+            : `<div class="segmented small">
           ${segBtnHtml('oddHandling', 'fixed', 'Ponto fixo', cfg.oddHandling === 'fixed')}
           ${segBtnHtml('oddHandling', 'duel', 'Duelo dos folguistas', cfg.oddHandling === 'duel')}
-        </div>
+        </div>`
+        }
         ${
           cfg.oddHandling === 'fixed'
             ? `<div class="subfield">
