@@ -665,6 +665,16 @@ export function finalStandingsModalHtml(state) {
         ${r2.byeDuelMatch ? matchCard(state, r2.byeDuelMatch, { tag: '⚔️ Duelo dos folguistas', readonly: true }) : ''}
       </div>`
     : '';
+  // A repescagem decidiu uma vaga — precisa aparecer no recap junto com a
+  // rodada, senão a tabela mostra duas posições trocadas sem o jogo que as
+  // trocou.
+  const repBlock = r1.repechageMatch
+    ? `<div class="recap-block">
+        <div class="recap-block-title">Repescagem · última vaga do Top ${state.cutoffResult.size}</div>
+        <div class="match-grid">${matchCard(state, r1.repechageMatch, { tag: '⚔️ Repescagem', readonly: true })}</div>
+      </div>`
+    : '';
+
   return `
     <h3>Fase de grupos · como terminou</h3>
     <div class="recap-block">
@@ -673,6 +683,7 @@ export function finalStandingsModalHtml(state) {
       <div class="match-grid">${r1Cards}</div>
     </div>
     ${r2Block}
+    ${repBlock}
     <div class="recap-block">
       <div class="recap-block-title">Classificação final</div>
       ${standingsTable(state, ranked, size)}

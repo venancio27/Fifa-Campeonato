@@ -285,6 +285,18 @@ export function startTournament(state) {
   return state;
 }
 
+// A repescagem é um jogo de verdade que a pessoa disputou, então conta na
+// coluna "J". Mas NÃO entra em pontos nem em gols: ela decide uma vaga, não a
+// campanha — e SG/GP/GC são critérios de desempate, então exibi-los com o
+// placar da repescagem mostraria números diferentes dos que ordenaram a tabela.
+function withRepechagePlayed(state, ranked) {
+  const m = state.round1 && state.round1.repechageMatch;
+  if (!m || !E.isMatchComplete(m)) return ranked;
+  return ranked.map((s) =>
+    s.playerId === m.player1Id || s.playerId === m.player2Id ? { ...s, played: s.played + 1 } : s
+  );
+}
+
 export function round1StandingsRanked(state) {
   const ids = state.players.map((p) => p.id);
   const byePts = state.config.oddHandling === 'fixed' ? state.config.fixedByePoints : 0;
@@ -293,7 +305,7 @@ export function round1StandingsRanked(state) {
     matches.push(byeEntry(state.round1.byePlayerId, byePts));
   }
   const stats = E.computeStandings(ids, matches, { byePoints: 0 });
-  return E.rankStandings(stats, saltMap(state));
+  return withRepechagePlayed(state, E.rankStandings(stats, saltMap(state)));
 }
 
 export function advanceToRound2(state) {
@@ -457,7 +469,7 @@ function cutoffWithRepechage(state) {
   // As faixas de sorteio precisam ser recalculadas DEPOIS da repescagem
   // reordenar a tabela: as que vieram de ranksWithoutBye apontam para posições
   // antigas, e a tela mostraria "5º ao 8º" com a marca em 5, 6, 7 e 9.
-  const display = E.markDrawGroups(ordered.map((s, i) => ({ ...s, rank: i + 1 })));
+  const display = withRepechagePlayed(state, E.markDrawGroups(ordered.map((s, i) => ({ ...s, rank: i + 1 }))));
   const topIds = display.slice(0, size).map((s) => s.playerId);
   return { ranked: display, topIds, size };
 }
