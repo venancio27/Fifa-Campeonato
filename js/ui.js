@@ -1,10 +1,15 @@
 import * as S from './state.js';
 import * as E from './engine.js';
 
+// innerHTML escapa & < >, mas não aspas — e o resultado daqui também é
+// interpolado dentro de atributos (value="...", title="..."). Sem escapar,
+// um nome como Zé "Pelé" fecharia o atributo no meio e o jogador voltava
+// truncado do modal de edição. As entidades voltam a virar aspas normais na
+// renderização, então o texto visível não muda.
 export function esc(str) {
   const d = document.createElement('div');
   d.textContent = str == null ? '' : String(str);
-  return d.innerHTML;
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // Bandeirinha horizontal com as cores do time (Cor 1 - Cor 2 - Cor 1, em faixa
@@ -109,8 +114,13 @@ function matchCard(state, m, opts = {}) {
 function byeCard(state, playerId, cfg) {
   if (!playerId) return '';
   const label = S.playerLabel(state, playerId);
-  const pts = cfg.oddHandling === 'fixed' ? cfg.fixedByePoints : 0;
-  const note = cfg.oddHandling === 'fixed' ? `ganha ${pts} ponto${pts > 1 ? 's' : ''} de folga` : 'sem pontos agora — vai jogar o duelo dos folguistas';
+  const pts = cfg.fixedByePoints;
+  const note =
+    cfg.oddHandling === 'fixed'
+      ? `ganha ${pts} ponto${pts > 1 ? 's' : ''} de folga`
+      : cfg.oddHandling === 'repechage'
+        ? 'sem pontos — disputa a repescagem pela última vaga do corte'
+        : 'sem pontos agora — vai jogar o duelo dos folguistas';
   return `<div class="bye-card">🌙 <strong>${esc(label)}</strong> tira folga nesta rodada (${note})</div>`;
 }
 
@@ -281,13 +291,29 @@ function renderRegistration(state) {
 // um cadastro tardio deixa o total ímpar depois que o campeonato já começou
 // e essa escolha nunca apareceu antes).
 function oddHandlingFieldHtml(cfg, n) {
+  // Com rodada única existe no máximo um folguista, então não há com quem
+  // duelar — sobra só o ponto fixo, e o seletor some pra não oferecer algo
+  // que seria revertido em seguida.
+  const single = cfg.groupRounds === 1;
   return `
     <div class="field">
       <label>Tratamento do número ímpar (${n} jogadores)</label>
-      <div class="segmented">
+      ${
+        single
+          ? `<div class="segmented">
+        <button type="button" class="seg-btn ${cfg.oddHandling === 'repechage' ? 'active' : ''}" data-action="set-odd-handling" data-value="repechage">Repescagem</button>
+        <button type="button" class="seg-btn ${cfg.oddHandling === 'fixed' ? 'active' : ''}" data-action="set-odd-handling" data-value="fixed">Ponto fixo</button>
+      </div>`
+          : `<div class="segmented">
         <button type="button" class="seg-btn ${cfg.oddHandling === 'fixed' ? 'active' : ''}" data-action="set-odd-handling" data-value="fixed">Ponto fixo</button>
         <button type="button" class="seg-btn ${cfg.oddHandling === 'duel' ? 'active' : ''}" data-action="set-odd-handling" data-value="duel">Duelo dos folguistas</button>
-      </div>
+      </div>`
+      }
+      ${
+        cfg.oddHandling === 'repechage'
+          ? '<p class="hint">O folguista não recebe pontos: ele desafia quem terminar na última vaga do corte, e quem vencer fica com ela. Assim ninguém entra no mata-mata sem jogar.</p>'
+          : ''
+      }
       ${
         cfg.oddHandling === 'fixed'
           ? `<div class="subfield">
@@ -297,7 +323,9 @@ function oddHandlingFieldHtml(cfg, n) {
                 <button type="button" class="seg-btn ${cfg.fixedByePoints === 2 ? 'active' : ''}" data-action="set-fixed-bye-points" data-value="2">2 pontos</button>
               </div>
             </div>`
-          : `<p class="hint locked">🔒 Com "duelo dos folguistas", a classificação fica travada em <strong>Soma R1+R2</strong>. Motivo: sob "só R2", o resultado do duelo avulso se tornaria o único fator decidindo o destino de quem folgou na R2 — um jogo estruturalmente diferente dos demais confrontos pareados por posição.</p>`
+          : cfg.oddHandling === 'duel'
+            ? `<p class="hint locked">🔒 Com "duelo dos folguistas", a classificação fica travada em <strong>Soma R1+R2</strong>. Motivo: sob "só R2", o resultado do duelo avulso se tornaria o único fator decidindo o destino de quem folgou na R2 — um jogo estruturalmente diferente dos demais confrontos pareados por posição.</p>`
+            : ''
       }
     </div>`;
 }
@@ -330,6 +358,18 @@ function renderConfigScreen(state) {
         !effectiveDirectKnockout
           ? `
         <div class="field">
+          <label>Formato da fase de grupos</label>
+          <div class="segmented">
+            <button type="button" class="seg-btn ${cfg.groupRounds === 2 ? 'active' : ''}" data-action="set-group-rounds" data-value="2">2 rodadas</button>
+            <button type="button" class="seg-btn ${cfg.groupRounds === 1 ? 'active' : ''}" data-action="set-group-rounds" data-value="1">Rodada única</button>
+          </div>
+          <p class="hint">
+            <strong>2 rodadas:</strong> todo mundo joga pelo menos 2 partidas antes do corte. A segunda rodada pareia por colocação (1º x último), então a classificação tem mais informação.<br/>
+            <strong>Rodada única:</strong> 1 jogo por pessoa e o corte sai direto dali — noite bem mais curta, mas quem perde o primeiro jogo já está fora da disputa por vaga.
+          </p>
+        </div>
+
+        <div class="field">
           <label>Corte pro mata-mata</label>
           <div class="segmented">
             ${cutoffOptions
@@ -343,7 +383,7 @@ function renderConfigScreen(state) {
         ${isOdd ? oddHandlingFieldHtml(cfg, n) : ''}
 
         ${
-          !(isOdd && cfg.oddHandling === 'duel')
+          cfg.groupRounds === 2 && !(isOdd && cfg.oddHandling === 'duel')
             ? `<div class="field">
               <label>Classificação usada para o corte</label>
               <div class="segmented">
@@ -394,6 +434,10 @@ function settingsIconHtml(state) {
 }
 
 function hasRoundSettings(state) {
+  // Rodada travada pela repescagem: nada de ajustar corte, número ímpar ou
+  // encaixar atrasado. Qualquer um dos três muda a classificação em que o
+  // desafiado foi escolhido, deixando a repescagem apontando pro lugar errado.
+  if (state.round1 && state.round1.repechageMatch) return false;
   if (S.availableCutoffSizes(state).length > 1) return true;
   if (state.phase === 'round1' && state.round1 && state.round1.byePlayerId) return true;
   return S.canAddLatePlayer(state);
@@ -402,18 +446,60 @@ function hasRoundSettings(state) {
 function renderRound1(state) {
   if (!state.reveal.round1) return renderRoundReveal('Sorteio da Rodada 1', 'reveal-round1', settingsIconHtml(state));
   const r1 = state.round1;
-  const cards = r1.matches.map((m) => matchCard(state, m)).join('');
   const bye = byeCard(state, r1.byePlayerId, state.config);
-  const complete = r1.matches.every((m) => E.isMatchComplete(m));
+  const roundDone = r1.matches.every((m) => E.isMatchComplete(m));
+  // No formato de rodada única a R1 é a fase de grupos inteira, então ela vai
+  // direto pro corte em vez de abrir a Rodada 2.
+  const single = state.config.groupRounds === 1;
+
+  // Três estados possíveis do botão quando há repescagem: ainda falta jogar a
+  // rodada, falta definir/jogar a repescagem, ou está tudo pronto pro corte.
+  const rep = r1.repechageMatch;
+  const repStep = S.usesRepechage(state) && (rep || S.canCreateRepechage(state));
+  let action = single ? 'advance-cutoff' : 'advance-round2';
+  let label = single ? 'Fechar fase de grupos ➜' : 'Avançar para Rodada 2 ➜';
+  let enabled = roundDone;
+  let hint = roundDone ? '' : 'Registre o placar de todas as partidas (e a folga, se houver) para avançar.';
+
+  if (repStep && !rep) {
+    action = 'create-repechage';
+    label = '⚔️ Definir repescagem ➜';
+    if (roundDone) {
+      hint = r1.repechageReset
+        ? `⚠️ O placar corrigido mudou quem está na ${state.config.cutoffSize}ª posição, então a repescagem anterior foi descartada — ela apontava para outro jogador. Defina de novo.`
+        : `O folguista vai desafiar quem terminar na ${state.config.cutoffSize}ª posição — a última vaga do Top ${state.config.cutoffSize}.`;
+    }
+  } else if (rep) {
+    enabled = roundDone && E.isMatchComplete(rep);
+    if (roundDone && !E.isMatchComplete(rep)) hint = 'Registre o placar da repescagem para fechar a fase de grupos.';
+  }
+
+  // Com a repescagem definida, os placares da rodada travam: o sorteio já foi
+  // feito na frente de todo mundo e o desafiado já foi anunciado. Corrigir um
+  // erro de digitação continua possível, mas exige reabrir a rodada de forma
+  // explícita — nada muda em silêncio depois do que a sala viu.
+  const cards = r1.matches.map((m) => matchCard(state, m, { readonly: !!rep })).join('');
+
+  const repCard = rep
+    ? `<div class="repechage-block">
+        ${matchCard(state, rep, { tag: `⚔️ Repescagem · vale a última vaga do Top ${state.config.cutoffSize}` })}
+      </div>
+      <div class="round-locked">
+        <span>🔒 Rodada travada — o sorteio e a repescagem foram definidos em cima desta classificação.</span>
+        <button class="btn btn-ghost btn-sm" data-action="cancel-repechage">Cancelar repescagem e reabrir a rodada</button>
+      </div>`
+    : '';
+
   return `
     <section class="panel">
-      <h2>Rodada 1 <span class="muted">· sorteio aleatório</span> ${settingsIconHtml(state)}</h2>
+      <h2>${single ? 'Rodada única' : 'Rodada 1'} <span class="muted">· sorteio aleatório</span> ${settingsIconHtml(state)}</h2>
       ${bye}
       <div class="match-grid">${cards}</div>
-      <button class="btn btn-primary btn-lg" data-action="advance-round2" ${complete ? '' : 'disabled'}>
-        Avançar para Rodada 2 ➜
+      ${repCard}
+      <button class="btn btn-primary btn-lg" data-action="${action}" ${enabled ? '' : 'disabled'}>
+        ${label}
       </button>
-      ${!complete ? '<p class="hint">Registre o placar de todas as partidas (e a folga, se houver) para avançar.</p>' : ''}
+      ${hint ? `<p class="hint">${hint}</p>` : ''}
     </section>`;
 }
 
@@ -464,16 +550,34 @@ function renderRound2(state, uiExtra = {}) {
 // Pts/SG/GP/GC nunca contam gol de pênalti (goalsForNormal/goalsAgainstNormal
 // já vêm assim calculados do engine.js). opts.compact esconde a coluna "Time"
 // e encolhe a fonte pra caber na lateral estreita.
+function playerNameOf(state, playerId) {
+  const p = S.getPlayer(state, playerId);
+  return p ? p.name : '?';
+}
+
 function standingsTable(state, ranked, cutoffSize, opts = {}) {
   const compact = !!opts.compact;
+
+  // Toda posição que só o sorteio separou é marcada com 🎲 e listada embaixo.
+  // Sem isso o desempate aleatório fica invisível e a tabela parece arbitrária
+  // — é exatamente o que gera reclamação na hora do corte.
+  const groups = [];
+  for (const s of ranked) {
+    if (s.drawGroup && !groups.some((g) => g.id === s.drawGroup.id)) groups.push(s.drawGroup);
+  }
+
   const rows = ranked
     .map((s) => {
       const cutClass = cutoffSize ? (s.rank <= cutoffSize ? 'cut-in' : 'cut-out') : '';
       const p = S.getPlayer(state, s.playerId);
+      const drawMark = s.drawGroup
+        ? `<span class="draw-mark" title="Empate total com ${s.drawGroup.from}º-${s.drawGroup.to}º: posição definida por sorteio (regra 5)">🎲</span>`
+        : '';
+      const repMark = s.viaRepechage ? '<span class="rep-mark" title="Posição definida na repescagem">⚔️</span>' : '';
       return `
-        <tr class="${cutClass}">
+        <tr class="${cutClass} ${s.drawGroup ? 'by-draw' : ''}">
           <td>${s.rank}º</td>
-          <td>${colorRibbon(p || {})} ${esc(p ? p.name : '?')}</td>
+          <td>${colorRibbon(p || {})} ${esc(p ? p.name : '?')}${drawMark}${repMark}</td>
           ${compact ? '' : `<td class="muted">${esc(p ? p.team : '')}</td>`}
           <td>${s.points}</td>
           <td>${s.played}</td>
@@ -483,12 +587,47 @@ function standingsTable(state, ranked, cutoffSize, opts = {}) {
         </tr>`;
     })
     .join('');
+
+  // A linha da repescagem contraria a leitura normal da tabela (o vencedor
+  // pode ter 0 pontos e ficar acima de quem tem 3), então explica em texto —
+  // no telão ninguém vai descobrir isso passando o mouse no ⚔️.
+  const repRows = ranked.filter((s) => s.viaRepechage);
+  const repNote =
+    repRows.length === 2
+      ? `<div class="draw-note rep-note">
+          <div class="draw-note-title">⚔️ Repescagem pela última vaga</div>
+          <p>O folguista não pontuou na rodada (não jogou), então disputou a ${repRows[0].rank}ª vaga em partida única contra quem a ocupava. Por isso essas duas posições não seguem a ordem de pontos:</p>
+          <ul>
+            <li><strong>${esc(playerNameOf(state, repRows[0].playerId))}</strong> venceu e ficou com a vaga (${repRows[0].rank}º)</li>
+            <li><strong>${esc(playerNameOf(state, repRows[1].playerId))}</strong> perdeu e caiu para ${repRows[1].rank}º</li>
+          </ul>
+        </div>`
+      : '';
+
+  // "Realizado ao vivo" só aparece quando o sorteio de fato rodou na tela.
+  // Na classificação provisória (durante as rodadas) ele ainda não aconteceu,
+  // e prometer um sorteio que não houve seria pior que não dizer nada.
+  const drawn = state.tiebreakDraw || {};
+  const jaSorteado = ranked.some((s) => s.drawGroup && drawn[s.playerId] != null);
+  const drawNote = groups.length
+    ? `<div class="draw-note">
+        <div class="draw-note-title">🎲 Desempate por sorteio${jaSorteado ? ' (realizado ao vivo)' : ''}</div>
+        <p>Nest${groups.length > 1 ? 'as faixas' : 'a faixa'} todos os critérios da regra 5 empataram (pontos, saldo, gols, confronto direto e pênaltis). ${
+          jaSorteado
+            ? 'A ordem abaixo foi sorteada na tela, no fechamento da fase de grupos:'
+            : 'A ordem só será decidida no sorteio, ao fechar a fase de grupos:'
+        }</p>
+        <ul>${groups.map((g) => `<li><strong>${g.from}º ao ${g.to}º</strong> — ${g.to - g.from + 1} jogadores empatados em tudo</li>`).join('')}</ul>
+      </div>`
+    : '';
+
   return `
     <table class="standings ${compact ? 'compact' : ''}">
       <thead><tr><th>Pos</th><th>Jogador</th>${compact ? '' : '<th>Time</th>'}<th>Pts</th><th title="Jogos realizados">J</th><th>SG</th><th>GP</th><th>GC</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    ${cutoffSize ? `<div class="cut-legend ${compact ? 'small' : ''}"><span class="dot cut-in"></span> classificado &nbsp; <span class="dot cut-out"></span> eliminado</div>` : ''}`;
+    ${cutoffSize ? `<div class="cut-legend ${compact ? 'small' : ''}"><span class="dot cut-in"></span> classificado &nbsp; <span class="dot cut-out"></span> eliminado</div>` : ''}
+    ${compact ? '' : repNote + drawNote}`;
 }
 
 // Ficha compacta pra lateral (sidebar) — mostra a classificação "se o corte
@@ -516,23 +655,35 @@ function finalStandingsButton(state) {
 export function finalStandingsModalHtml(state) {
   const { ranked, size } = state.cutoffResult;
   const r1 = state.round1;
-  const r2 = state.round2;
+  const r2 = state.round2; // null no formato de rodada única
   const r1Cards = r1.matches.map((m) => matchCard(state, m, { readonly: true })).join('');
-  const r2Cards = r2.matches.map((m) => matchCard(state, m, { readonly: true })).join('');
-  const r2Duel = r2.byeDuelMatch ? matchCard(state, r2.byeDuelMatch, { tag: '⚔️ Duelo dos folguistas', readonly: true }) : '';
+  const r2Block = r2
+    ? `<div class="recap-block">
+        <div class="recap-block-title">Rodada 2</div>
+        ${byeCard(state, r2.byePlayerId, state.config)}
+        <div class="match-grid">${r2.matches.map((m) => matchCard(state, m, { readonly: true })).join('')}</div>
+        ${r2.byeDuelMatch ? matchCard(state, r2.byeDuelMatch, { tag: '⚔️ Duelo dos folguistas', readonly: true }) : ''}
+      </div>`
+    : '';
+  // A repescagem decidiu uma vaga — precisa aparecer no recap junto com a
+  // rodada, senão a tabela mostra duas posições trocadas sem o jogo que as
+  // trocou.
+  const repBlock = r1.repechageMatch
+    ? `<div class="recap-block">
+        <div class="recap-block-title">Repescagem · última vaga do Top ${state.cutoffResult.size}</div>
+        <div class="match-grid">${matchCard(state, r1.repechageMatch, { tag: '⚔️ Repescagem', readonly: true })}</div>
+      </div>`
+    : '';
+
   return `
     <h3>Fase de grupos · como terminou</h3>
     <div class="recap-block">
-      <div class="recap-block-title">Rodada 1</div>
+      <div class="recap-block-title">${r2 ? 'Rodada 1' : 'Rodada única'}</div>
       ${byeCard(state, r1.byePlayerId, state.config)}
       <div class="match-grid">${r1Cards}</div>
     </div>
-    <div class="recap-block">
-      <div class="recap-block-title">Rodada 2</div>
-      ${byeCard(state, r2.byePlayerId, state.config)}
-      <div class="match-grid">${r2Cards}</div>
-      ${r2Duel}
-    </div>
+    ${r2Block}
+    ${repBlock}
     <div class="recap-block">
       <div class="recap-block-title">Classificação final</div>
       ${standingsTable(state, ranked, size)}
@@ -542,7 +693,8 @@ export function finalStandingsModalHtml(state) {
 function renderCutoffScreen(state) {
   const { ranked, size } = state.cutoffResult;
   const cfg = state.config;
-  const modeLabel = cfg.classification === 'sum' ? 'Soma R1 + R2' : 'Só R2 conta';
+  const modeLabel =
+    cfg.groupRounds === 1 ? 'Rodada única' : cfg.classification === 'sum' ? 'Soma R1 + R2' : 'Só R2 conta';
   return `
     <section class="panel">
       <h2>Classificação final da fase de grupos</h2>
@@ -661,9 +813,20 @@ function renderBracketTree(state) {
 function renderKnockout(state, opts = {}) {
   const k = state.knockout;
   const lastRound = k.rounds[k.rounds.length - 1];
-  const complete = lastRound.matches.every((m) => E.isMatchComplete(m));
   const isFinal = lastRound.size === 2;
   const H = opts.headingTag || 'h2';
+
+  // A disputa de 3º lugar nasce junto com a final e mora fora de rounds[], então
+  // precisa entrar na conta explicitamente: consagrar o campeão põe a fase em
+  // "finished", que deixa o card do 3º lugar somente-leitura — se ele ainda
+  // estivesse pendente, o placar não teria mais como ser lançado.
+  const roundDone = lastRound.matches.every((m) => E.isMatchComplete(m));
+  const thirdPending = !!k.thirdPlace && !E.isMatchComplete(k.thirdPlace);
+  const complete = roundDone && !thirdPending;
+
+  const pendingHint = thirdPending && roundDone
+    ? 'Falta lançar o placar da disputa de 3º lugar antes de consagrar o campeão.'
+    : 'Registre o placar de todas as partidas desta fase para avançar.';
 
   return `
     <section class="panel">
@@ -672,7 +835,7 @@ function renderKnockout(state, opts = {}) {
       <button class="btn btn-primary btn-lg" data-action="advance-knockout" ${complete ? '' : 'disabled'}>
         ${isFinal ? '🏆 Consagrar campeão' : 'Avançar fase ➜'}
       </button>
-      ${!complete ? '<p class="hint">Registre o placar de todas as partidas desta fase para avançar.</p>' : ''}
+      ${!complete ? `<p class="hint">${pendingHint}</p>` : ''}
     </section>`;
 }
 
@@ -709,6 +872,105 @@ function renderFinished(state) {
     ${renderBracketTree(state)}`;
 }
 
+// ---------- Regulamento ----------
+// Disponível em qualquer fase pelo botão do cabeçalho. A numeração (1 a 18) é
+// a mesma do regulamento combinado com os jogadores, pra dar pra citar "regra
+// 9" numa discussão no meio da noite sem ambiguidade.
+export function rulesModalHtml() {
+  return `
+    <h3>📖 Regras do Campeonato de FIFA</h3>
+    <div class="rules-body">
+
+      <div class="rules-section">
+        <div class="rules-section-title">Cadastro e times</div>
+        <ol class="rules-list">
+          <li>Cada jogador se inscreve com <strong>nome + time do FIFA</strong> que vai usar.</li>
+          <li>O time escolhido vale pro campeonato inteiro — <strong>sem trocar de time</strong> durante o campeonato.</li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Formato</div>
+        <ol class="rules-list" start="3">
+          <li>O formato do campeonato será <strong>definido no dia, por votação</strong> entre os inscritos, assim que soubermos o número exato de participantes. Vence a opção mais votada; em caso de empate, o voto do organizador desempata.</li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Pontuação e desempate <span class="rules-note">(fase de grupos, se houver)</span></div>
+        <ol class="rules-list" start="4">
+          <li>
+            Pontuação por partida:
+            <table class="rules-table">
+              <tr><td>Vitória no tempo normal</td><td><strong>3</strong></td></tr>
+              <tr><td>Vitória nos pênaltis</td><td><strong>2</strong></td></tr>
+              <tr><td>Derrota nos pênaltis</td><td><strong>1</strong></td></tr>
+              <tr><td>Derrota no tempo normal</td><td><strong>0</strong></td></tr>
+            </table>
+          </li>
+          <li>
+            Desempate na classificação, <strong>nesta ordem</strong>:
+            <ol class="rules-sublist">
+              <li>Pontos totais</li>
+              <li>Saldo de gols <strong>no tempo normal</strong></li>
+              <li>Gols marcados no tempo normal</li>
+              <li>Confronto direto (se os dois jogaram entre si)</li>
+              <li>Saldo de gols nos pênaltis</li>
+              <li>Gols marcados nos pênaltis</li>
+              <li>Sorteio</li>
+            </ol>
+            <p class="rules-why">Os pênaltis ficam por último de propósito: o resultado do pênalti já virou ponto na regra 4, então contá-lo de novo no saldo pesaria duas vezes.</p>
+          </li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Tempo de jogo</div>
+        <ol class="rules-list" start="6">
+          <li>Rodadas 1 e 2 (se houver fase de grupos): <strong>4 minutos</strong> por tempo.</li>
+          <li>A partir das quartas de final: <strong>5 minutos</strong> por tempo.</li>
+          <li>Empatou depois do tempo normal → <strong>pênaltis</strong>.</li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Paradas durante a partida <span class="rules-note">(a cota é de cada jogador; cada parada de até 30s)</span></div>
+        <ol class="rules-list" start="9">
+          <li>Fase de grupos e quartas de final: <strong>1 parada por jogador</strong>.</li>
+          <li>A partir das semifinais: <strong>2 paradas por jogador</strong>.</li>
+          <li>Na final: <strong>3 paradas por jogador</strong>.</li>
+          <li>Se um jogador <strong>se machucar</strong>, a parada não entra na cota — é à parte, sem limite.</li>
+        </ol>
+        <p class="rules-why">Cada um gasta a sua: assim ninguém queima a cota do adversário pausando de propósito.</p>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Montagem do time</div>
+        <ol class="rules-list" start="13">
+          <li>Rodada 1: até <strong>2 minutos</strong> para montagem do time antes da partida.</li>
+          <li>A partir da segunda rodada: até <strong>1 minuto</strong>.</li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Ausência (W.O.)</div>
+        <ol class="rules-list" start="15">
+          <li>Se o jogador for chamado e não aparecer em até <strong>3 minutos</strong>, perde a partida por W.O.</li>
+          <li>Exceção: em caso extremo, com justificativa (ex.: saiu pra comprar algo pro evento), o W.O. pode ser cancelado se pelo menos <strong>metade + 1</strong> das pessoas presentes concordarem com a justificativa <em>e</em> concordarem em alterar a ordem das partidas.</li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <div class="rules-section-title">Outras</div>
+        <ol class="rules-list" start="17">
+          <li>Problema técnico do console/controle <strong>não conta</strong> na cota de paradas — igual à regra de lesão.</li>
+          <li>Regras excepcionais podem ser adicionadas e acordadas no decorrer da competição, apenas em caso de trazer maior dinamicidade ao campeonato. Para ser aprovada, precisa de pelo menos <strong>2/3 dos votantes</strong>.</li>
+        </ol>
+      </div>
+
+    </div>`;
+}
+
 // ---------- Header / shell ----------
 function renderHeader(state) {
   const isOperator = state.viewMode === 'operator';
@@ -719,15 +981,16 @@ function renderHeader(state) {
         <div class="brand-title">Campeonato FIFA VIVA 2026</div>
       </div>
       <div class="header-actions">
+        <button class="btn btn-ghost" data-action="show-rules" title="Ver o regulamento do campeonato">📖 Regras</button>
         <button class="btn btn-ghost" data-action="toggle-view">${isOperator ? '📺 Modo Telão' : '🛠 Modo Operador'}</button>
         ${
           isOperator
             ? `<button class="btn btn-ghost" data-action="download-backup" title="Baixar um arquivo com todo o progresso do campeonato">💾 Baixar backup</button>
                <button class="btn btn-ghost" data-action="trigger-upload-backup" title="Carregar um backup salvo anteriormente">📂 Carregar backup</button>
-               <input type="file" id="backup-file-input" accept="application/json" hidden />`
+               <input type="file" id="backup-file-input" accept="application/json" hidden />
+               <button class="btn btn-ghost btn-danger" data-action="reset-all">Reiniciar tudo</button>`
             : ''
         }
-        <button class="btn btn-ghost btn-danger" data-action="reset-all">Reiniciar tudo</button>
       </div>
     </header>`;
 }

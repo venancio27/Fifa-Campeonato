@@ -20,7 +20,15 @@ export function openInfoModal(bodyHtml) {
   function close() {
     overlay.classList.remove('show');
     setTimeout(() => overlay.remove(), 200);
+    document.removeEventListener('keydown', onKey);
   }
+  // Esc fecha: o regulamento é consultado no meio da noite, com o organizador
+  // de mão ocupada — tirar a mão do teclado pra achar o botão atrapalha.
+  function onKey(e) {
+    if (e.key === 'Escape') close();
+  }
+  document.addEventListener('keydown', onKey);
+
   overlay.querySelector('[data-action="close"]').addEventListener('click', close);
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) close();
@@ -211,13 +219,19 @@ function configSectionsHtml(state) {
   }
 
   if (showOdd) {
+    // Rodada única não tem segundo folguista pra duelar — só o ponto fixo.
+    const single = cfg.groupRounds === 1;
     parts.push(`
       <div class="field">
         <label>Tratamento do número ímpar (${state.players.length} jogadores)</label>
-        <div class="segmented small">
+        ${
+          single
+            ? ''
+            : `<div class="segmented small">
           ${segBtnHtml('oddHandling', 'fixed', 'Ponto fixo', cfg.oddHandling === 'fixed')}
           ${segBtnHtml('oddHandling', 'duel', 'Duelo dos folguistas', cfg.oddHandling === 'duel')}
-        </div>
+        </div>`
+        }
         ${
           cfg.oddHandling === 'fixed'
             ? `<div class="subfield">

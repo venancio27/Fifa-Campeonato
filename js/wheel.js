@@ -94,7 +94,10 @@ function lockedSlotHtml() {
 }
 
 function summaryRowHtml(item) {
-  if (item.kind === 'bye') {
+  // Qualquer kind de slot único (folga, sorteio de desempate) — só 'match'
+  // tem dois jogadores. Testar por 'bye' aqui fazia o "Pular animação"
+  // estourar no sorteio de desempate e travar o overlay sem saída.
+  if (item.kind !== 'match') {
     return `
       <div class="draw-summary-row">
         <div class="ds-title">${esc(item.title)}</div>
@@ -116,7 +119,7 @@ function summaryRowHtml(item) {
 // playersPool: lista de todos os jogadores em jogo { name, team, color1, color2 }
 // (usada pros reels rolarem por combinações aleatórias antes de travar no real).
 // Retorna uma Promise que resolve quando o organizador fecha a animação.
-export function runDrawAnimation({ items, playersPool, caption }) {
+export function runDrawAnimation({ items, playersPool, caption, nextLabel = 'Próximo confronto ➜' }) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'draw-overlay';
@@ -151,11 +154,11 @@ export function runDrawAnimation({ items, playersPool, caption }) {
     }
 
     function totalSlots(item) {
-      return item.kind === 'bye' ? 1 : 2;
+      return item.kind === 'match' ? 2 : 1;
     }
 
     function slotPlayer(item, i) {
-      if (item.kind === 'bye') return item.player;
+      if (item.kind !== 'match') return item.player;
       return i === 0 ? item.player1 : item.player2;
     }
 
@@ -167,7 +170,7 @@ export function runDrawAnimation({ items, playersPool, caption }) {
         if (total === 1) nextBtn.textContent = 'Sortear';
         else nextBtn.textContent = slotIdx === 0 ? 'Sortear jogador 1' : 'Sortear jogador 2';
       } else {
-        nextBtn.textContent = isLastItem ? 'Concluir' : 'Próximo confronto ➜';
+        nextBtn.textContent = isLastItem ? 'Concluir' : nextLabel;
       }
     }
 
@@ -175,7 +178,7 @@ export function runDrawAnimation({ items, playersPool, caption }) {
       const item = items[i];
       progressEl.textContent = String(i + 1);
       const title = `<div class="draw-sub">${esc(item.title)}</div>`;
-      if (item.kind === 'bye') {
+      if (item.kind !== 'match') {
         stage.innerHTML = `${title}<div class="draw-row"><div class="slot-wrap" data-slot="0">${lockedSlotHtml()}</div></div>`;
       } else {
         stage.innerHTML = `

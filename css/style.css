@@ -691,6 +691,90 @@ body.has-ticker main { padding-bottom: 56px; }
 .modal-card-settings .modal-actions { justify-content: center; }
 .modal-card-wide { max-width: 900px; text-align: left; }
 .modal-card-wide h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.03em; color: var(--flame-3); margin: 0 0 14px; text-align: center; }
+/* ---------- evidencia de sorteio / repescagem na classificacao ---------- */
+.draw-mark, .rep-mark { margin-left: 6px; font-size: 0.85em; cursor: help; }
+.standings tr.by-draw td { background: rgba(255, 203, 5, 0.06); }
+.repechage-block { margin: 4px 0 16px; max-width: 420px; }
+.draw-note {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 203, 5, 0.32);
+  border-radius: 10px;
+  background: rgba(255, 203, 5, 0.06);
+  font-size: 0.85rem;
+}
+.draw-note-title { font-weight: 700; color: var(--yellow); margin-bottom: 6px; }
+.draw-note.rep-note { border-color: rgba(255, 122, 26, 0.34); background: rgba(255, 122, 26, 0.07); margin-bottom: 10px; }
+.draw-note.rep-note .draw-note-title { color: var(--flame-3); }
+.draw-note p { margin: 0 0 6px; color: var(--muted); line-height: 1.5; }
+.draw-note ul { margin: 0; padding-left: 20px; color: var(--text); }
+.draw-note li { margin-bottom: 3px; }
+
+/* ---------- rodada travada pela repescagem ---------- */
+.round-locked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 122, 26, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 122, 26, 0.06);
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+.round-locked span { flex: 1; min-width: 220px; }
+
+/* ---------- regulamento ---------- */
+/* O corpo tem rolagem própria em vez de deixar o card inteiro rolar: assim o
+   botão "Fechar" não foge pro fim de um documento de 18 regras. */
+.rules-body {
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 10px;
+  margin-bottom: 4px;
+}
+.rules-section { margin-bottom: 20px; }
+.rules-section:last-child { margin-bottom: 0; }
+.rules-section-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  color: var(--flame-3);
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.rules-note { color: var(--muted); font-family: 'Poppins', sans-serif; font-size: 0.72rem; letter-spacing: 0; text-transform: none; }
+
+.rules-list { margin: 0; padding-left: 22px; }
+.rules-list > li { margin-bottom: 9px; line-height: 1.55; font-size: 0.92rem; }
+.rules-list > li::marker { color: var(--flame-1); font-weight: 600; }
+.rules-sublist { margin: 8px 0 0; padding-left: 20px; }
+.rules-sublist li { margin-bottom: 3px; font-size: 0.88rem; }
+.rules-sublist li::marker { color: var(--muted); }
+
+.rules-table { border-collapse: collapse; margin: 8px 0 2px; width: 100%; max-width: 320px; }
+.rules-table td { padding: 5px 10px; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+.rules-table td:last-child { text-align: right; color: var(--flame-3); font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; }
+
+.rules-why {
+  margin: 8px 0 0;
+  padding: 8px 11px;
+  border-left: 2px solid var(--flame-1);
+  background: rgba(255, 122, 26, 0.07);
+  border-radius: 0 8px 8px 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  .rules-body { max-height: 68vh; }
+  .rules-table { max-width: none; }
+}
+
 .recap-block { margin-bottom: 22px; }
 .recap-block-title { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.04em; color: var(--flame-3); margin-bottom: 10px; font-size: 1.05rem; }
 .score-form { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 16px 0; }

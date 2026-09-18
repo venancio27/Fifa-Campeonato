@@ -142,6 +142,44 @@ function compareStanding(a, b) {
   return a._tiebreakSalt - b._tiebreakSalt;
 }
 
+// Dois jogadores que empataram em TODOS os critérios da regra 5 — a ordem
+// entre eles saiu do sorteio (o último critério). Serve pra tela poder avisar
+// "esta posição foi decidida por sorteio" em vez de o resultado parecer
+// arbitrário e virar reclamação.
+export function tiedOnlyByDraw(a, b) {
+  if (a.points !== b.points) return false;
+  if (a.gdNormal !== b.gdNormal) return false;
+  if (a.goalsForNormal !== b.goalsForNormal) return false;
+  const h2h = a.headToHead && a.headToHead[b.playerId];
+  if (h2h && h2h.pointsFor !== h2h.pointsAgainst) return false;
+  if (a.gdPens !== b.gdPens) return false;
+  if (a.goalsForPens !== b.goalsForPens) return false;
+  return true;
+}
+
+// Marca cada faixa de jogadores consecutivos que só o sorteio separou.
+// Devolve a mesma lista com drawGroup: null | { id, from, to } — from/to são
+// as posições envolvidas, pra tela poder dizer "sorteio decidiu 5º-7º".
+export function markDrawGroups(ranked) {
+  const out = ranked.map((s) => ({ ...s, drawGroup: null }));
+  // Quem entrou pela repescagem teve a posição decidida em campo, não no
+  // sorteio — nunca agrupa, mesmo que os números batam com o vizinho.
+  const agrupavel = (a, b) => !a.viaRepechage && !b.viaRepechage && tiedOnlyByDraw(a, b);
+  let i = 0;
+  let groupId = 0;
+  while (i < out.length) {
+    let j = i;
+    while (j + 1 < out.length && agrupavel(out[j], out[j + 1])) j++;
+    if (j > i) {
+      groupId++;
+      const info = { id: groupId, from: out[i].rank, to: out[j].rank };
+      for (let k = i; k <= j; k++) out[k].drawGroup = info;
+    }
+    i = j + 1;
+  }
+  return out;
+}
+
 // Retorna lista ordenada [{ ...stats, rank }] a partir do mapa de stats.
 export function rankStandings(statsMap, saltMap = {}) {
   const list = Object.values(statsMap).map((s) => ({
@@ -149,7 +187,7 @@ export function rankStandings(statsMap, saltMap = {}) {
     _tiebreakSalt: saltMap[s.playerId] != null ? saltMap[s.playerId] : Math.random(),
   }));
   list.sort(compareStanding);
-  return list.map((s, i) => ({ ...s, rank: i + 1 }));
+  return markDrawGroups(list.map((s, i) => ({ ...s, rank: i + 1 })));
 }
 
 // ---------- Rodada 1: sorteio aleatório ----------
