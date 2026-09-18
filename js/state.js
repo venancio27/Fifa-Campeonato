@@ -388,6 +388,51 @@ export function availableCutoffSizes(state) {
   return [4, 8, 16].filter((v) => v <= n);
 }
 
+// Estimativa de quantas partidas o formato escolhido vai gerar — usada na tela
+// de configuração como referência de duração da noite. É "quantos jogos", não
+// "quanto tempo": o operador já sabe o tempo de cada partida pelas regras.
+//
+// approx=true quando o número real depende de algo que só se sabe durante o
+// campeonato (o duelo dos folguistas pode não acontecer, se os dois folguistas
+// da R1 e R2 forem a mesma pessoa) — nesse caso o total é o teto, não o exato.
+export function estimateMatchCount(state) {
+  const n = state.players.length;
+  if (n < 4) return { group: 0, knockout: 0, total: 0, approx: false };
+
+  const cfg = state.config;
+  const isOdd = n % 2 === 1;
+  const effectiveDirectKnockout = cfg.directKnockout && E.isPowerOfTwo(n);
+
+  let group = 0;
+  let approx = false;
+  let bracketSize;
+
+  if (effectiveDirectKnockout) {
+    bracketSize = n;
+  } else {
+    bracketSize = cfg.cutoffSize;
+    const perRound = Math.floor(n / 2); // um folguista não joga; o resto pareia em duplas
+
+    if (cfg.groupRounds === 1) {
+      group = perRound;
+      if (isOdd && cfg.oddHandling === 'repechage') group += 1; // repescagem sempre acontece (há sempre 1 folguista)
+    } else {
+      group = perRound * 2; // Rodada 1 + Rodada 2, mesma quantidade de pares cada
+      if (isOdd && cfg.oddHandling === 'duel') {
+        group += 1; // duelo dos folguistas — só não ocorre se o mesmo jogador folgar 2x, caso raro
+        approx = true;
+      }
+    }
+  }
+
+  // Chave eliminatória simples: bracketSize-1 jogos. 3º lugar soma 1, e só
+  // existe quando há semifinal (bracketSize >= 4 — sempre verdade aqui, já
+  // que o mínimo pra iniciar o campeonato é 4 jogadores).
+  const knockout = Math.max(0, bracketSize - 1) + (cfg.thirdPlaceMatch && bracketSize >= 4 ? 1 : 0);
+
+  return { group, knockout, total: group + knockout, approx };
+}
+
 // ---------- Repescagem (rodada única + número ímpar) ----------
 // O folguista não tem campanha, então não entra na classificação por pontos:
 // ele desafia quem está na última vaga do corte. Quem vencer fica com a vaga.
