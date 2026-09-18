@@ -330,6 +330,16 @@ function oddHandlingFieldHtml(cfg, n) {
     </div>`;
 }
 
+// Nota discreta no canto do painel de configuração: quantos jogos o formato
+// escolhido deve gerar. Recalcula a cada clique porque toda opção da tela
+// (rodadas, corte, ímpar, 3º lugar) entra na conta.
+function matchEstimateCornerHtml(state) {
+  const est = S.estimateMatchCount(state);
+  if (!est.total) return '';
+  const til = est.approx ? '≈ ' : '';
+  return `<div class="match-estimate" title="Estimativa de partidas com as opções atuais (grupos: ${est.group} · mata-mata: ${est.knockout})">${til}${est.total} partida${est.total === 1 ? '' : 's'} no total</div>`;
+}
+
 function renderConfigScreen(state) {
   const n = state.players.length;
   const canDirectKnockout = E.isPowerOfTwo(n);
@@ -339,7 +349,8 @@ function renderConfigScreen(state) {
   const isOdd = n % 2 === 1;
 
   return `
-    <section class="panel">
+    <section class="panel config-panel">
+      ${matchEstimateCornerHtml(state)}
       <h2>Configuração do campeonato</h2>
       <p class="hint">${n} jogador${n === 1 ? '' : 'es'} cadastrado${n === 1 ? '' : 's'}. <button type="button" class="link-btn" data-action="back-to-registration">‹ Voltar pro cadastro</button></p>
 
